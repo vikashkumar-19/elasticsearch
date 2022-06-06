@@ -21,17 +21,26 @@ package org.elasticsearch.rest.action.document;
 
 import org.apache.logging.log4j.LogManager;
 import org.elasticsearch.Version;
+import org.elasticsearch.action.index.IndexHelper;
 import org.elasticsearch.action.index.IndexRequest;
+import org.elasticsearch.action.index.IndexResponse;
 import org.elasticsearch.action.support.ActiveShardCount;
 import org.elasticsearch.client.node.NodeClient;
 import org.elasticsearch.cluster.service.ClusterService;
+import org.elasticsearch.common.bytes.BytesReference;
 import org.elasticsearch.common.logging.DeprecationLogger;
+import org.elasticsearch.common.xcontent.StatusToXContentObject;
+import org.elasticsearch.common.xcontent.ToXContentObject;
+import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.index.VersionType;
+import org.elasticsearch.index.get.GetResult;
 import org.elasticsearch.index.mapper.MapperService;
 import org.elasticsearch.rest.BaseRestHandler;
 import org.elasticsearch.rest.RestRequest;
+import org.elasticsearch.rest.RestResponse;
 import org.elasticsearch.rest.action.RestActions;
 import org.elasticsearch.rest.action.RestStatusToXContentListener;
+import org.elasticsearch.search.fetch.subphase.FetchSourceContext;
 
 import java.io.IOException;
 import java.util.List;
@@ -144,6 +153,11 @@ public class RestIndexAction extends BaseRestHandler {
         indexRequest.versionType(VersionType.fromString(request.param("version_type"), indexRequest.versionType()));
         indexRequest.setIfSeqNo(request.paramAsLong("if_seq_no", indexRequest.ifSeqNo()));
         indexRequest.setIfPrimaryTerm(request.paramAsLong("if_primary_term", indexRequest.ifPrimaryTerm()));
+        FetchSourceContext fetchSourceContext = FetchSourceContext.parseFromRestRequest(request);
+        if (fetchSourceContext != null) {
+            indexRequest.fetchSource(fetchSourceContext);
+        }
+
         String sOpType = request.param("op_type");
         String waitForActiveShards = request.param("wait_for_active_shards");
         if (waitForActiveShards != null) {
@@ -154,7 +168,23 @@ public class RestIndexAction extends BaseRestHandler {
         }
 
         return channel ->
-                client.index(indexRequest, new RestStatusToXContentListener<>(channel, r -> r.getLocation(indexRequest.routing())));
+                client.index(indexRequest, new RestStatusToXContentListener<IndexResponse>(channel, r -> r.getLocation(indexRequest.routing())){
+                    @Override
+                    public RestResponse buildResponse(IndexResponse indexResponse, XContentBuilder builder) throws Exception {
+                        final BytesReference indexSourceBytes = indexRequest.source();
+                        GetResult sourceResult = IndexHelper.extractGetResult(
+                            indexRequest,
+                            indexResponse.getIndex(),
+                            indexResponse.getSeqNo(),
+                            indexResponse.getPrimaryTerm(),
+                            indexResponse.getVersion(),
+                            indexRequest.sourceAsMap(),
+                            indexRequest.getContentType(),
+                            indexSourceBytes);
+                        indexResponse.setGetResult(sourceResult);
+                        return super.buildResponse(indexResponse, builder);
+                    }
+                });
     }
 
 }

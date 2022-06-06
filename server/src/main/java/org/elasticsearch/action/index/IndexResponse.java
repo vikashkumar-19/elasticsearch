@@ -22,7 +22,9 @@ package org.elasticsearch.action.index;
 import org.elasticsearch.action.DocWriteResponse;
 import org.elasticsearch.common.Strings;
 import org.elasticsearch.common.io.stream.StreamInput;
+import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.common.xcontent.XContentParser;
+import org.elasticsearch.index.get.GetResult;
 import org.elasticsearch.index.shard.ShardId;
 import org.elasticsearch.rest.RestStatus;
 
@@ -37,6 +39,8 @@ import static org.elasticsearch.common.xcontent.XContentParserUtils.ensureExpect
  * @see org.elasticsearch.client.Client#index(IndexRequest)
  */
 public class IndexResponse extends DocWriteResponse {
+
+    private static final String GET = "get";
 
     public IndexResponse(StreamInput in) throws IOException {
         super(in);
@@ -55,9 +59,32 @@ public class IndexResponse extends DocWriteResponse {
         return result;
     }
 
+    private GetResult getResult;
+
+    public void setGetResult(GetResult getResult) {
+        this.getResult = getResult;
+    }
+
+    public GetResult getGetResult() {
+        return this.getResult;
+    }
+
+
     @Override
     public RestStatus status() {
         return result == Result.CREATED ? RestStatus.CREATED : super.status();
+    }
+
+
+    @Override
+    public XContentBuilder innerToXContent(XContentBuilder builder, Params params) throws IOException {
+        super.innerToXContent(builder, params);
+        if (getGetResult() != null) {
+            builder.startObject(GET);
+            getGetResult().toXContentEmbedded(builder, params);
+            builder.endObject();
+        }
+        return builder;
     }
 
     @Override
@@ -98,12 +125,25 @@ public class IndexResponse extends DocWriteResponse {
      * instantiate the {@link IndexResponse}.
      */
     public static class Builder extends DocWriteResponse.Builder {
+
+        private GetResult getResult = null;
+
+        public void setGetResult(GetResult getResult) {
+            this.getResult = getResult;
+        }
+
         @Override
         public IndexResponse build() {
             IndexResponse indexResponse = new IndexResponse(shardId, type, id, seqNo, primaryTerm, version, result);
             indexResponse.setForcedRefresh(forcedRefresh);
             if (shardInfo != null) {
                 indexResponse.setShardInfo(shardInfo);
+            }
+            if(getResult !=null){
+                indexResponse.setGetResult( new GetResult(indexResponse.getIndex(),indexResponse.getType(),indexResponse.getId(),
+                    getResult.getSeqNo(), getResult.getPrimaryTerm(),indexResponse.getVersion(),
+                    getResult.isExists(),getResult.internalSourceRef(),getResult.getDocumentFields(),
+                    getResult.getMetadataFields()));
             }
             return indexResponse;
         }

@@ -25,6 +25,7 @@ import org.elasticsearch.common.xcontent.LoggingDeprecationHandler;
 import org.elasticsearch.rest.RestRequest;
 import org.elasticsearch.script.Script;
 import org.elasticsearch.script.ScriptType;
+import org.elasticsearch.search.fetch.subphase.FetchSourceContext;
 
 import java.io.IOException;
 import java.util.Collections;
@@ -76,6 +77,10 @@ public class RestUpdateByQueryAction extends AbstractBulkByQueryRestHandler<Upda
         consumers.put("script", o -> internal.setScript(parseScript(o)));
         consumers.put("max_docs", s -> setMaxDocsValidateIdentical(internal, ((Number) s).intValue()));
 
+        FetchSourceContext fetchSourceContext = FetchSourceContext.parseFromRestRequest(request);
+        if (fetchSourceContext != null) {
+            internal.fetchSource(fetchSourceContext);
+        }
         parseInternalRequest(internal, request, consumers);
 
         internal.setPipeline(request.param("pipeline"));

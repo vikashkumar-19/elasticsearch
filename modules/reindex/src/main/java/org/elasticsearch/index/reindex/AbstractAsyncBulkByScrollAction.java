@@ -33,6 +33,7 @@ import org.elasticsearch.action.bulk.BulkRequest;
 import org.elasticsearch.action.bulk.BulkResponse;
 import org.elasticsearch.action.bulk.Retry;
 import org.elasticsearch.action.delete.DeleteRequest;
+import org.elasticsearch.action.index.IndexHelper;
 import org.elasticsearch.action.index.IndexRequest;
 import org.elasticsearch.action.support.TransportAction;
 import org.elasticsearch.client.ParentTaskAssigningClient;
@@ -41,6 +42,7 @@ import org.elasticsearch.common.unit.ByteSizeValue;
 import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.common.util.concurrent.AbstractRunnable;
 import org.elasticsearch.index.VersionType;
+import org.elasticsearch.index.get.GetResult;
 import org.elasticsearch.index.mapper.IdFieldMapper;
 import org.elasticsearch.index.mapper.IndexFieldMapper;
 import org.elasticsearch.index.mapper.RoutingFieldMapper;
@@ -108,6 +110,9 @@ public abstract class AbstractAsyncBulkByScrollAction<Request extends AbstractBu
     private final Retry bulkRetry;
     private final ScrollableHitSource scrollSource;
 
+    private Map<String, DocWriteRequest<?>> allBulkIndexRequest = new HashMap<>();
+
+    private List<GetResult> sourceReturnResult = new ArrayList<>();
     /**
      * This BiFunction is used to apply various changes depending of the Reindex action and  the search hit,
      * from copying search hit metadata (parent, routing, etc) to potentially transforming the
@@ -324,6 +329,11 @@ public abstract class AbstractAsyncBulkByScrollAction<Request extends AbstractBu
             }
         }
         BulkRequest request = buildBulk(hits);
+        if(needToFetchSource()) {
+            for(DocWriteRequest<?> indexRequest:request.requests()){
+                allBulkIndexRequest.put(indexRequest.id(),indexRequest);
+            }
+        }
         if (request.requests().isEmpty()) {
             /*
              * If we noop-ed the entire batch then just skip to the next batch or the BulkRequest would fail validation.
@@ -369,6 +379,7 @@ public abstract class AbstractAsyncBulkByScrollAction<Request extends AbstractBu
         try {
             List<Failure> failures = new ArrayList<>();
             Set<String> destinationIndicesThisBatch = new HashSet<>();
+
             for (BulkItemResponse item : response) {
                 if (item.isFailed()) {
                     recordFailure(item.getFailure(), failures);
@@ -381,6 +392,19 @@ public abstract class AbstractAsyncBulkByScrollAction<Request extends AbstractBu
                             worker.countCreated();
                         } else {
                             worker.countUpdated();
+                        }
+                        if(needToFetchSource()){
+                            IndexRequest indexRequest = (IndexRequest) allBulkIndexRequest.get(item.getId());
+
+                            sourceReturnResult.add(IndexHelper.extractGetResult(
+                                indexRequest,
+                                item.getResponse().getIndex(),
+                                item.getResponse().getSeqNo(),
+                                item.getResponse().getPrimaryTerm(),
+                                item.getResponse().getVersion(),
+                                indexRequest.sourceAsMap(),
+                                indexRequest.getContentType(),
+                                indexRequest.source()));
                         }
                         break;
                     case UPDATE:
@@ -489,6 +513,9 @@ public abstract class AbstractAsyncBulkByScrollAction<Request extends AbstractBu
                 BulkByScrollResponse response = buildResponse(
                         timeValueNanos(System.nanoTime() - startTime.get()),
                         indexingFailures, searchFailures, timedOut);
+                if(needToFetchSource()){
+                    response.setGetResults(sourceReturnResult);
+                }
                 listener.onResponse(response);
             } else {
                 listener.onFailure(failure);
@@ -880,5 +907,20 @@ public abstract class AbstractAsyncBulkByScrollAction<Request extends AbstractBu
         public String toString() {
             return id.toLowerCase(Locale.ROOT);
         }
+    }
+
+
+
+
+
+    /**
+     * Return true if there is need to return the updated documents
+     */
+    public boolean needToFetchSource(){
+        if(((UpdateByQueryRequest) mainRequest).fetchSource()==null ||
+            ((UpdateByQueryRequest) mainRequest).fetchSource().fetchSource()==false){
+            return false;
+        }
+        return true;
     }
 }

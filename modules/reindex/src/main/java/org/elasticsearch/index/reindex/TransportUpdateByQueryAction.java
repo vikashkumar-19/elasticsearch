@@ -22,6 +22,7 @@ package org.elasticsearch.index.reindex;
 import org.apache.logging.log4j.Logger;
 import org.elasticsearch.Version;
 import org.elasticsearch.action.ActionListener;
+import org.elasticsearch.action.bulk.BulkItemResponse;
 import org.elasticsearch.action.index.IndexRequest;
 import org.elasticsearch.action.support.ActionFilters;
 import org.elasticsearch.action.support.HandledTransportAction;
@@ -31,6 +32,7 @@ import org.elasticsearch.cluster.ClusterState;
 import org.elasticsearch.cluster.service.ClusterService;
 import org.elasticsearch.common.inject.Inject;
 import org.elasticsearch.common.io.stream.Writeable;
+import org.elasticsearch.common.util.concurrent.AtomicArray;
 import org.elasticsearch.index.mapper.IdFieldMapper;
 import org.elasticsearch.index.mapper.IndexFieldMapper;
 import org.elasticsearch.index.mapper.RoutingFieldMapper;
@@ -50,6 +52,8 @@ public class TransportUpdateByQueryAction extends HandledTransportAction<UpdateB
     private final Client client;
     private final ScriptService scriptService;
     private final ClusterService clusterService;
+
+
 
     @Inject
     public TransportUpdateByQueryAction(ThreadPool threadPool, ActionFilters actionFilters, Client client,
@@ -115,6 +119,9 @@ public class TransportUpdateByQueryAction extends HandledTransportAction<UpdateB
             index.setIfSeqNo(doc.getSeqNo());
             index.setIfPrimaryTerm(doc.getPrimaryTerm());
             index.setPipeline(mainRequest.getPipeline());
+            if (!(this.mainRequest.fetchSource() == null || this.mainRequest.fetchSource().fetchSource() == false)) {
+                index.fetchSource(this.mainRequest.fetchSource());
+            }
             return wrap(index);
         }
 

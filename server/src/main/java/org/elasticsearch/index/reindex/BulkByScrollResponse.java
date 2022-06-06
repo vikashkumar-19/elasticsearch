@@ -24,6 +24,7 @@ import org.elasticsearch.ElasticsearchParseException;
 import org.elasticsearch.action.ActionResponse;
 import org.elasticsearch.action.bulk.BulkItemResponse.Failure;
 import org.elasticsearch.common.xcontent.ObjectParser;
+import org.elasticsearch.index.get.GetResult;
 import org.elasticsearch.index.reindex.BulkByScrollTask.Status;
 import org.elasticsearch.common.Nullable;
 import org.elasticsearch.common.ParseField;
@@ -60,6 +61,10 @@ public class BulkByScrollResponse extends ActionResponse implements ToXContentFr
     private static final String TOOK_FIELD = "took";
     private static final String TIMED_OUT_FIELD = "timed_out";
     private static final String FAILURES_FIELD = "failures";
+
+    private static final String GET = "get";
+
+    private List<GetResult> getResults;
 
     @SuppressWarnings("unchecked")
     private static final ObjectParser<BulkByScrollResponseBuilder, Void> PARSER =
@@ -111,6 +116,15 @@ public class BulkByScrollResponse extends ActionResponse implements ToXContentFr
         took = timeValueNanos(mergedTook);
         status = new BulkByScrollTask.Status(statuses, reasonCancelled);
     }
+
+    public void setGetResults(List<GetResult> getResults) {
+        this.getResults = getResults;
+    }
+
+    public List<GetResult> getGetResults() {
+        return getResults;
+    }
+
 
     public TimeValue getTook() {
         return took;
@@ -214,6 +228,15 @@ public class BulkByScrollResponse extends ActionResponse implements ToXContentFr
             failure.toXContent(builder, params);
         }
         builder.endArray();
+        if(getResults!=null){
+            builder.startArray(GET);
+            for(GetResult getResult:getResults){
+//                builder.startObject();     // No need as GetResult will start it internally
+                getResult.toXContent(builder,params);
+//                builder.endObject();
+            }
+            builder.endArray();
+        }
         return builder;
     }
 

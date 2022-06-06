@@ -20,13 +20,17 @@
 package org.elasticsearch.index.reindex;
 
 import org.elasticsearch.action.IndicesRequest;
+import org.elasticsearch.action.index.IndexRequest;
 import org.elasticsearch.action.search.SearchRequest;
 import org.elasticsearch.action.support.IndicesOptions;
+import org.elasticsearch.common.Nullable;
+import org.elasticsearch.common.Strings;
 import org.elasticsearch.common.io.stream.StreamInput;
 import org.elasticsearch.common.io.stream.StreamOutput;
 import org.elasticsearch.common.xcontent.ToXContentObject;
 import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.index.query.QueryBuilder;
+import org.elasticsearch.search.fetch.subphase.FetchSourceContext;
 import org.elasticsearch.tasks.TaskId;
 
 import java.io.IOException;
@@ -43,6 +47,7 @@ public class UpdateByQueryRequest extends AbstractBulkIndexByScrollRequest<Updat
      * Ingest pipeline to set on index requests made by this action.
      */
     private String pipeline;
+    private FetchSourceContext fetchSourceContext;
 
     public UpdateByQueryRequest() {
         this(new SearchRequest());
@@ -216,4 +221,73 @@ public class UpdateByQueryRequest extends AbstractBulkIndexByScrollRequest<Updat
         builder.endObject();
         return builder;
     }
+
+
+
+
+
+
+    /**
+     * Indicate that _source should be returned with every hit, with an
+     * "include" and/or "exclude" set which can include simple wildcard
+     * elements.
+     *
+     * @param include
+     *            An optional include (optionally wildcarded) pattern to filter
+     *            the returned _source
+     * @param exclude
+     *            An optional exclude (optionally wildcarded) pattern to filter
+     *            the returned _source
+     */
+    public UpdateByQueryRequest fetchSource(@Nullable String include, @Nullable String exclude) {
+        FetchSourceContext context = this.fetchSourceContext == null ? FetchSourceContext.FETCH_SOURCE : this.fetchSourceContext;
+        String[] includes = include == null ? Strings.EMPTY_ARRAY : new String[]{include};
+        String[] excludes = exclude == null ? Strings.EMPTY_ARRAY : new String[]{exclude};
+        this.fetchSourceContext = new FetchSourceContext(context.fetchSource(), includes, excludes);
+        return this;
+    }
+
+    /**
+     * Indicate that _source should be returned, with an
+     * "include" and/or "exclude" set which can include simple wildcard
+     * elements.
+     *
+     * @param includes
+     *            An optional list of include (optionally wildcarded) pattern to
+     *            filter the returned _source
+     * @param excludes
+     *            An optional list of exclude (optionally wildcarded) pattern to
+     *            filter the returned _source
+     */
+    public UpdateByQueryRequest fetchSource(@Nullable String[] includes, @Nullable String[] excludes) {
+        FetchSourceContext context = this.fetchSourceContext == null ? FetchSourceContext.FETCH_SOURCE : this.fetchSourceContext;
+        this.fetchSourceContext = new FetchSourceContext(context.fetchSource(), includes, excludes);
+        return this;
+    }
+
+    /**
+     * Indicates whether the response should contain the updated _source.
+     */
+    public UpdateByQueryRequest fetchSource(boolean fetchSource) {
+        FetchSourceContext context = this.fetchSourceContext == null ? FetchSourceContext.FETCH_SOURCE : this.fetchSourceContext;
+        this.fetchSourceContext = new FetchSourceContext(fetchSource, context.includes(), context.excludes());
+        return this;
+    }
+
+    /**
+     * Explicitly set the fetch source context for this request
+     */
+    public UpdateByQueryRequest fetchSource(FetchSourceContext context) {
+        this.fetchSourceContext = context;
+        return this;
+    }
+
+    /**
+     * Gets the {@link FetchSourceContext} which defines how the _source should
+     * be fetched.
+     */
+    public FetchSourceContext fetchSource() {
+        return fetchSourceContext;
+    }
+
 }

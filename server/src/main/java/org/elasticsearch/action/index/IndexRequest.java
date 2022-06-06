@@ -27,10 +27,12 @@ import org.elasticsearch.action.DocWriteRequest;
 import org.elasticsearch.action.RoutingMissingException;
 import org.elasticsearch.action.support.replication.ReplicatedWriteRequest;
 import org.elasticsearch.action.support.replication.ReplicationRequest;
+import org.elasticsearch.action.update.UpdateRequest;
 import org.elasticsearch.client.Requests;
 import org.elasticsearch.cluster.metadata.MappingMetaData;
 import org.elasticsearch.cluster.metadata.MetaData;
 import org.elasticsearch.common.Nullable;
+import org.elasticsearch.common.ParseField;
 import org.elasticsearch.common.Strings;
 import org.elasticsearch.common.UUIDs;
 import org.elasticsearch.common.bytes.BytesArray;
@@ -39,13 +41,12 @@ import org.elasticsearch.common.io.stream.StreamInput;
 import org.elasticsearch.common.io.stream.StreamOutput;
 import org.elasticsearch.common.lucene.uid.Versions;
 import org.elasticsearch.common.unit.ByteSizeValue;
-import org.elasticsearch.common.xcontent.XContentBuilder;
-import org.elasticsearch.common.xcontent.XContentFactory;
-import org.elasticsearch.common.xcontent.XContentHelper;
-import org.elasticsearch.common.xcontent.XContentType;
+import org.elasticsearch.common.xcontent.*;
 import org.elasticsearch.index.VersionType;
 import org.elasticsearch.index.mapper.MapperService;
 import org.elasticsearch.index.shard.ShardId;
+import org.elasticsearch.script.Script;
+import org.elasticsearch.search.fetch.subphase.FetchSourceContext;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -76,6 +77,14 @@ import static org.elasticsearch.index.seqno.SequenceNumbers.UNASSIGNED_SEQ_NO;
  */
 public class IndexRequest extends ReplicatedWriteRequest<IndexRequest> implements DocWriteRequest<IndexRequest>, CompositeIndicesRequest {
 
+    private static ObjectParser<IndexRequest, Void> PARSER;
+    private static final ParseField SOURCE_FIELD = new ParseField("_source");
+    static {
+        PARSER = new ObjectParser<>(IndexRequest.class.getSimpleName());
+        PARSER.declareField(IndexRequest::fetchSource,
+            (parser, context) -> FetchSourceContext.fromXContent(parser), SOURCE_FIELD,
+            ObjectParser.ValueType.OBJECT_ARRAY_BOOLEAN_OR_STRING);
+        }
     /**
      * Max length of the source document to include into string()
      *
@@ -86,6 +95,7 @@ public class IndexRequest extends ReplicatedWriteRequest<IndexRequest> implement
     private static final ShardId NO_SHARD_ID = null;
 
     // Set to null initially so we can know to override in bulk requests that have a default type.
+    private FetchSourceContext fetchSourceContext;
     private String type;
     private String id;
     @Nullable
@@ -528,6 +538,88 @@ public class IndexRequest extends ReplicatedWriteRequest<IndexRequest> implement
         this.opType = opType;
         return this;
     }
+
+
+
+
+
+
+
+    /**
+     * Indicate that _source should be returned with every hit, with an
+     * "include" and/or "exclude" set which can include simple wildcard
+     * elements.
+     *
+     * @param include
+     *            An optional include (optionally wildcarded) pattern to filter
+     *            the returned _source
+     * @param exclude
+     *            An optional exclude (optionally wildcarded) pattern to filter
+     *            the returned _source
+     */
+    public IndexRequest fetchSource(@Nullable String include, @Nullable String exclude) {
+        FetchSourceContext context = this.fetchSourceContext == null ? FetchSourceContext.FETCH_SOURCE : this.fetchSourceContext;
+        String[] includes = include == null ? Strings.EMPTY_ARRAY : new String[]{include};
+        String[] excludes = exclude == null ? Strings.EMPTY_ARRAY : new String[]{exclude};
+        this.fetchSourceContext = new FetchSourceContext(context.fetchSource(), includes, excludes);
+        return this;
+    }
+
+    /**
+     * Indicate that _source should be returned, with an
+     * "include" and/or "exclude" set which can include simple wildcard
+     * elements.
+     *
+     * @param includes
+     *            An optional list of include (optionally wildcarded) pattern to
+     *            filter the returned _source
+     * @param excludes
+     *            An optional list of exclude (optionally wildcarded) pattern to
+     *            filter the returned _source
+     */
+    public IndexRequest fetchSource(@Nullable String[] includes, @Nullable String[] excludes) {
+        FetchSourceContext context = this.fetchSourceContext == null ? FetchSourceContext.FETCH_SOURCE : this.fetchSourceContext;
+        this.fetchSourceContext = new FetchSourceContext(context.fetchSource(), includes, excludes);
+        return this;
+    }
+
+    /**
+     * Indicates whether the response should contain the updated _source.
+     */
+    public IndexRequest fetchSource(boolean fetchSource) {
+        FetchSourceContext context = this.fetchSourceContext == null ? FetchSourceContext.FETCH_SOURCE : this.fetchSourceContext;
+        this.fetchSourceContext = new FetchSourceContext(fetchSource, context.includes(), context.excludes());
+        return this;
+    }
+
+    /**
+     * Explicitly set the fetch source context for this request
+     */
+    public IndexRequest fetchSource(FetchSourceContext context) {
+        this.fetchSourceContext = context;
+        return this;
+    }
+
+    /**
+     * Gets the {@link FetchSourceContext} which defines how the _source should
+     * be fetched.
+     */
+    public FetchSourceContext fetchSource() {
+        return fetchSourceContext;
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     /**
      * Sets a string representation of the {@link #opType(OpType)}. Can
