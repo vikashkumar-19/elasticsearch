@@ -121,6 +121,70 @@ public class FetchSourceContext implements Writeable, ToXContentObject {
         return null;
     }
 
+    public static FetchSourceContext parseFromRestRequestNew(RestRequest request) {
+        Boolean fetchSource = null;
+        String[] sourceExcludes = null;
+        String[] sourceIncludes = null;
+
+        String source = request.param("req_new_source");
+        if (source != null) {
+            if (Booleans.isTrue(source)) {
+                fetchSource = true;
+            } else if (Booleans.isFalse(source)) {
+                fetchSource = false;
+            } else {
+                sourceIncludes = Strings.splitStringByCommaToArray(source);
+            }
+        }
+
+        String sIncludes = request.param("req_new_source_includes");
+        if (sIncludes != null) {
+            sourceIncludes = Strings.splitStringByCommaToArray(sIncludes);
+        }
+
+        String sExcludes = request.param("req_new_source_excludes");
+        if (sExcludes != null) {
+            sourceExcludes = Strings.splitStringByCommaToArray(sExcludes);
+        }
+
+        if (fetchSource != null || sourceIncludes != null || sourceExcludes != null) {
+            return new FetchSourceContext(fetchSource == null ? true : fetchSource, sourceIncludes, sourceExcludes);
+        }
+        return null;
+    }
+
+    public static FetchSourceContext parseFromRestRequestOld(RestRequest request) {
+        Boolean fetchSource = null;
+        String[] sourceExcludes = null;
+        String[] sourceIncludes = null;
+
+        String source = request.param("req_old_source");
+        if (source != null) {
+            if (Booleans.isTrue(source)) {
+                fetchSource = true;
+            } else if (Booleans.isFalse(source)) {
+                fetchSource = false;
+            } else {
+                sourceIncludes = Strings.splitStringByCommaToArray(source);
+            }
+        }
+
+        String sIncludes = request.param("req_old_source_includes");
+        if (sIncludes != null) {
+            sourceIncludes = Strings.splitStringByCommaToArray(sIncludes);
+        }
+
+        String sExcludes = request.param("req_old_source_excludes");
+        if (sExcludes != null) {
+            sourceExcludes = Strings.splitStringByCommaToArray(sExcludes);
+        }
+
+        if (fetchSource != null || sourceIncludes != null || sourceExcludes != null) {
+            return new FetchSourceContext(fetchSource == null ? true : fetchSource, sourceIncludes, sourceExcludes);
+        }
+        return null;
+    }
+
     public static FetchSourceContext fromXContent(XContentParser parser) throws IOException {
         XContentParser.Token token = parser.currentToken();
         boolean fetchSource = true;

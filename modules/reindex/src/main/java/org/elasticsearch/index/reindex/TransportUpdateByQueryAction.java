@@ -119,9 +119,6 @@ public class TransportUpdateByQueryAction extends HandledTransportAction<UpdateB
             index.setIfSeqNo(doc.getSeqNo());
             index.setIfPrimaryTerm(doc.getPrimaryTerm());
             index.setPipeline(mainRequest.getPipeline());
-            if (!(this.mainRequest.fetchSource() == null || this.mainRequest.fetchSource().fetchSource() == false)) {
-                index.fetchSource(this.mainRequest.fetchSource());
-            }
             return wrap(index);
         }
 

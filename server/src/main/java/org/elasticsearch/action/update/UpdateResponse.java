@@ -35,9 +35,11 @@ import static org.elasticsearch.common.xcontent.XContentParserUtils.ensureExpect
 public class UpdateResponse extends DocWriteResponse {
 
     private static final String GET = "get";
+    private static final String REQ_NEW_SOURCE = "req_new_source";
+    private static final String REQ_OLD_SOURCE = "req_old_source";
 
     private GetResult getResult;
-
+    private GetResult getResultOld;
     public UpdateResponse(StreamInput in) throws IOException {
         super(in);
         if (in.readBoolean()) {
@@ -67,6 +69,14 @@ public class UpdateResponse extends DocWriteResponse {
         return this.getResult;
     }
 
+    public void setGetResultOld(GetResult getResultOld) {
+        this.getResultOld = getResultOld;
+    }
+
+    public GetResult getGetResultOld() {
+        return this.getResultOld;
+    }
+
     @Override
     public RestStatus status() {
         return this.result == Result.CREATED ? RestStatus.CREATED : super.status();
@@ -87,8 +97,13 @@ public class UpdateResponse extends DocWriteResponse {
     public XContentBuilder innerToXContent(XContentBuilder builder, Params params) throws IOException {
         super.innerToXContent(builder, params);
         if (getGetResult() != null) {
-            builder.startObject(GET);
+            builder.startObject(REQ_NEW_SOURCE);
             getGetResult().toXContentEmbedded(builder, params);
+            builder.endObject();
+        }
+        if (getGetResultOld() != null) {
+            builder.startObject(REQ_OLD_SOURCE);
+            getGetResultOld().toXContentEmbedded(builder, params);
             builder.endObject();
         }
         return builder;
@@ -106,6 +121,7 @@ public class UpdateResponse extends DocWriteResponse {
         builder.append(",primaryTerm=").append(getPrimaryTerm());
         builder.append(",result=").append(getResult().getLowercase());
         builder.append(",shards=").append(getShardInfo());
+        builder.append(",sourse=").append(getGetResult()!=null?getGetResult().sourceAsString():null);
         return builder.append("]").toString();
     }
 
@@ -143,9 +159,13 @@ public class UpdateResponse extends DocWriteResponse {
     public static class Builder extends DocWriteResponse.Builder {
 
         private GetResult getResult = null;
+        private GetResult getResultOld = null;
 
         public void setGetResult(GetResult getResult) {
             this.getResult = getResult;
+        }
+        public void setGetResultOld(GetResult getResultOld) {
+            this.getResultOld = getResultOld;
         }
 
         @Override
@@ -161,6 +181,12 @@ public class UpdateResponse extends DocWriteResponse {
                     getResult.getSeqNo(), getResult.getPrimaryTerm(), update.getVersion(),
                     getResult.isExists(), getResult.internalSourceRef(), getResult.getDocumentFields(),
                     getResult.getMetadataFields()));
+            }
+            if(getResultOld != null){
+                update.setGetResultOld(new GetResult(update.getIndex(), update.getType(),update.getId(),
+                    getResultOld.getSeqNo(),getResultOld.getPrimaryTerm(),update.getVersion(),
+                    getResultOld.isExists(),getResultOld.internalSourceRef(), getResultOld.getDocumentFields(),
+                    getResultOld.getMetadataFields()));
             }
             update.setForcedRefresh(forcedRefresh);
             return update;

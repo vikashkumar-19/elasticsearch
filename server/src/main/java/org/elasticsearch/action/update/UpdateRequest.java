@@ -44,6 +44,7 @@ import org.elasticsearch.common.xcontent.XContentParser;
 import org.elasticsearch.common.xcontent.XContentType;
 import org.elasticsearch.index.VersionType;
 import org.elasticsearch.index.mapper.MapperService;
+import org.elasticsearch.index.reindex.UpdateByQueryRequest;
 import org.elasticsearch.index.shard.ShardId;
 import org.elasticsearch.script.Script;
 import org.elasticsearch.script.ScriptType;
@@ -107,6 +108,7 @@ public class UpdateRequest extends InstanceShardOperationRequest<UpdateRequest>
     Script script;
 
     private FetchSourceContext fetchSourceContext;
+    private FetchSourceContext fetchSourceContextOld;
 
     private int retryOnConflict = 0;
     private long ifSeqNo = UNASSIGNED_SEQ_NO;
@@ -235,7 +237,7 @@ public class UpdateRequest extends InstanceShardOperationRequest<UpdateRequest>
     @Override
     public String type() {
         if (type == null) {
-            return MapperService.SINGLE_MAPPING_NAME;                    
+            return MapperService.SINGLE_MAPPING_NAME;
         }
         return type;
     }
@@ -264,8 +266,8 @@ public class UpdateRequest extends InstanceShardOperationRequest<UpdateRequest>
             type = defaultType;
         }
         return this;
-    }  
-    
+    }
+
     /**
      * The id of the indexed document.
      */
@@ -538,6 +540,70 @@ public class UpdateRequest extends InstanceShardOperationRequest<UpdateRequest>
      */
     public FetchSourceContext fetchSource() {
         return fetchSourceContext;
+    }
+
+
+    /**
+     * Indicate that _source should be returned with every hit before applying script (i.e. before update document), with an
+     * "include" and/or "exclude" set which can include simple wildcard
+     * elements.
+     *
+     * @param include
+     *            An optional include (optionally wildcarded) pattern to filter
+     *            the returned _source
+     * @param exclude
+     *            An optional exclude (optionally wildcarded) pattern to filter
+     *            the returned _source
+     */
+    public UpdateRequest fetchSourceOld(@Nullable String include, @Nullable String exclude) {
+        FetchSourceContext context = this.fetchSourceContextOld == null ? FetchSourceContext.FETCH_SOURCE : this.fetchSourceContextOld;
+        String[] includes = include == null ? Strings.EMPTY_ARRAY : new String[]{include};
+        String[] excludes = exclude == null ? Strings.EMPTY_ARRAY : new String[]{exclude};
+        this.fetchSourceContextOld = new FetchSourceContext(context.fetchSource(), includes, excludes);
+        return this;
+    }
+
+    /**
+     * Indicate that _source should be returned, with an
+     * "include" and/or "exclude" set which can include simple wildcard
+     * elements.
+     *
+     * @param includes
+     *            An optional list of include (optionally wildcarded) pattern to
+     *            filter the returned _source
+     * @param excludes
+     *            An optional list of exclude (optionally wildcarded) pattern to
+     *            filter the returned _source
+     */
+    public UpdateRequest fetchSourcOld(@Nullable String[] includes, @Nullable String[] excludes) {
+        FetchSourceContext context = this.fetchSourceContextOld == null ? FetchSourceContext.FETCH_SOURCE : this.fetchSourceContextOld;
+        this.fetchSourceContextOld = new FetchSourceContext(context.fetchSource(), includes, excludes);
+        return this;
+    }
+
+    /**
+     * Indicates whether the response should contain the Old _source.
+     */
+    public UpdateRequest fetchSourceOld(boolean fetchSource) {
+        FetchSourceContext context = this.fetchSourceContextOld == null ? FetchSourceContext.FETCH_SOURCE : this.fetchSourceContextOld;
+        this.fetchSourceContextOld = new FetchSourceContext(fetchSource, context.includes(), context.excludes());
+        return this;
+    }
+
+    /**
+     * Explicitly set the fetch source context for this request
+     */
+    public UpdateRequest fetchSourceOld(FetchSourceContext context) {
+        this.fetchSourceContextOld = context;
+        return this;
+    }
+
+    /**
+     * Gets the {@link FetchSourceContext} which defines how the _source should
+     * be fetched.
+     */
+    public FetchSourceContext fetchSourceOld() {
+        return fetchSourceContextOld;
     }
 
     /**
@@ -873,8 +939,8 @@ public class UpdateRequest extends InstanceShardOperationRequest<UpdateRequest>
     public void writeTo(StreamOutput out) throws IOException {
         super.writeTo(out);
         waitForActiveShards.writeTo(out);
-        // A 7.x request allows null types but if deserialized in a 6.x node will cause nullpointer exceptions. 
-        // So we use the type accessor method here to make the type non-null (will default it to "_doc"). 
+        // A 7.x request allows null types but if deserialized in a 6.x node will cause nullpointer exceptions.
+        // So we use the type accessor method here to make the type non-null (will default it to "_doc").
         out.writeString(type());
         out.writeString(id);
         out.writeOptionalString(routing);

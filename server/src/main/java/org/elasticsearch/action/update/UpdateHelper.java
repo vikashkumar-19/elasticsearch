@@ -44,6 +44,7 @@ import org.elasticsearch.index.shard.ShardId;
 import org.elasticsearch.script.Script;
 import org.elasticsearch.script.ScriptService;
 import org.elasticsearch.script.UpdateScript;
+import org.elasticsearch.search.fetch.subphase.FetchSourceContext;
 import org.elasticsearch.search.lookup.SourceLookup;
 
 import java.io.IOException;
@@ -72,6 +73,30 @@ public class UpdateHelper {
         final GetResult getResult = indexShard.getService().getForUpdate(
             request.type(), request.id(), request.ifSeqNo(), request.ifPrimaryTerm());
         return prepare(indexShard.shardId(), request, getResult, nowInMillis);
+    }
+    public class prepareResponseObjectWithGetResult{
+        private Result _result;
+        private GetResult OldSource;
+
+        public prepareResponseObjectWithGetResult(Result _result, GetResult oldSource){
+            this._result = _result;
+            this.OldSource = oldSource;
+        }
+        public Result getPrepareResult(){
+            return _result;
+        }
+
+        public GetResult getOldSource(){
+            return OldSource;
+        }
+    }
+    public prepareResponseObjectWithGetResult prepare(UpdateRequest request, IndexShard indexShard, LongSupplier nowInMillis, FetchSourceContext needOldSource) {
+        final GetResult getResult = indexShard.getService().getForUpdate(
+            request.type(), request.id(), request.ifSeqNo(), request.ifPrimaryTerm());
+        if(needOldSource !=null && needOldSource.fetchSource()==true){
+            return new prepareResponseObjectWithGetResult(prepare(indexShard.shardId(), request, getResult, nowInMillis), getResult);
+        }
+        return new prepareResponseObjectWithGetResult(prepare(indexShard.shardId(), request, getResult, nowInMillis),null);
     }
 
     /**

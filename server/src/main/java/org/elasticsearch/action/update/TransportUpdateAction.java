@@ -50,6 +50,7 @@ import org.elasticsearch.common.xcontent.XContentHelper;
 import org.elasticsearch.common.xcontent.XContentType;
 import org.elasticsearch.index.IndexService;
 import org.elasticsearch.index.engine.VersionConflictEngineException;
+import org.elasticsearch.index.get.GetResult;
 import org.elasticsearch.index.shard.IndexShard;
 import org.elasticsearch.index.shard.ShardId;
 import org.elasticsearch.indices.IndicesService;
@@ -173,7 +174,9 @@ public class TransportUpdateAction extends TransportInstanceSingleOperationActio
         final ShardId shardId = request.getShardId();
         final IndexService indexService = indicesService.indexServiceSafe(shardId.getIndex());
         final IndexShard indexShard = indexService.getShard(shardId.getId());
-        final UpdateHelper.Result result = updateHelper.prepare(request, indexShard, threadPool::absoluteTimeInMillis);
+        final UpdateHelper.prepareResponseObjectWithGetResult _output = updateHelper.prepare(request, indexShard, threadPool::absoluteTimeInMillis, request.fetchSourceOld());
+        final UpdateHelper.Result result = _output.getPrepareResult();
+        final GetResult ReqSourceOld = _output.getOldSource();
         switch (result.getResponseResult()) {
             case CREATED:
                 IndexRequest upsertRequest = result.action();
@@ -193,6 +196,7 @@ public class TransportUpdateAction extends TransportInstanceSingleOperationActio
                             } else {
                                 update.setGetResult(null);
                             }
+                            update.setGetResultOld(ReqSourceOld);
                             update.setForcedRefresh(response.forcedRefresh());
                             listener.onResponse(update);
                         }, exception -> handleUpdateFailureWithRetry(listener, request, exception, retryCount)))
@@ -211,6 +215,7 @@ public class TransportUpdateAction extends TransportInstanceSingleOperationActio
                             update.setGetResult(UpdateHelper.extractGetResult(request, request.concreteIndex(),
                                 response.getSeqNo(), response.getPrimaryTerm(), response.getVersion(),
                                 result.updatedSourceAsMap(), result.updateSourceContentType(), indexSourceBytes));
+                            update.setGetResultOld(ReqSourceOld);
                             update.setForcedRefresh(response.forcedRefresh());
                             listener.onResponse(update);
                         }, exception -> handleUpdateFailureWithRetry(listener, request, exception, retryCount)))
@@ -226,6 +231,7 @@ public class TransportUpdateAction extends TransportInstanceSingleOperationActio
                             update.setGetResult(UpdateHelper.extractGetResult(request, request.concreteIndex(),
                                 response.getSeqNo(), response.getPrimaryTerm(), response.getVersion(),
                                 result.updatedSourceAsMap(), result.updateSourceContentType(), null));
+                            update.setGetResultOld(ReqSourceOld);
                             update.setForcedRefresh(response.forcedRefresh());
                             listener.onResponse(update);
                         }, exception -> handleUpdateFailureWithRetry(listener, request, exception, retryCount)))

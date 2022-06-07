@@ -79,9 +79,14 @@ public class RestUpdateAction extends BaseRestHandler {
             updateRequest.waitForActiveShards(ActiveShardCount.parseString(waitForActiveShards));
         }
         updateRequest.docAsUpsert(request.paramAsBoolean("doc_as_upsert", updateRequest.docAsUpsert()));
-        FetchSourceContext fetchSourceContext = FetchSourceContext.parseFromRestRequest(request);
+        FetchSourceContext fetchSourceContext = FetchSourceContext.parseFromRestRequestNew(request);
         if (fetchSourceContext != null) {
             updateRequest.fetchSource(fetchSourceContext);
+        }
+
+        FetchSourceContext fetchSourceContextOld = FetchSourceContext.parseFromRestRequestOld(request);
+        if (fetchSourceContextOld != null) {
+            updateRequest.fetchSourceOld(fetchSourceContextOld);
         }
 
         updateRequest.retryOnConflict(request.paramAsInt("retry_on_conflict", updateRequest.retryOnConflict()));

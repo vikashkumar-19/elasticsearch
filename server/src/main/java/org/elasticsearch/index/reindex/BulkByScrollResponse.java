@@ -62,9 +62,11 @@ public class BulkByScrollResponse extends ActionResponse implements ToXContentFr
     private static final String TIMED_OUT_FIELD = "timed_out";
     private static final String FAILURES_FIELD = "failures";
 
-    private static final String GET = "get";
+    private static final String REQ_NEW_SOURCE = "req_new_source";
+    private static final String REQ_OLD_SOURCE = "req_old_source";
 
-    private List<GetResult> getResults;
+    private List<GetResult> getResultsNew;
+    private List<GetResult> getResultsOld;
 
     @SuppressWarnings("unchecked")
     private static final ObjectParser<BulkByScrollResponseBuilder, Void> PARSER =
@@ -117,14 +119,21 @@ public class BulkByScrollResponse extends ActionResponse implements ToXContentFr
         status = new BulkByScrollTask.Status(statuses, reasonCancelled);
     }
 
-    public void setGetResults(List<GetResult> getResults) {
-        this.getResults = getResults;
+    public void setGetResultsNew(List<GetResult> getResults) {
+        this.getResultsNew = getResults;
     }
 
-    public List<GetResult> getGetResults() {
-        return getResults;
+    public List<GetResult> getGetResultsNew() {
+        return getResultsNew;
     }
 
+    public void setGetResultsOld(List<GetResult> getResults) {
+        this.getResultsOld = getResults;
+    }
+
+    public List<GetResult> getGetResultsOld() {
+        return getResultsOld;
+    }
 
     public TimeValue getTook() {
         return took;
@@ -217,6 +226,7 @@ public class BulkByScrollResponse extends ActionResponse implements ToXContentFr
     public XContentBuilder toXContent(XContentBuilder builder, Params params) throws IOException {
         builder.field(TOOK_FIELD, took.millis());
         builder.field(TIMED_OUT_FIELD, timedOut);
+//        builder.field("DEV-Check", "OK");
         status.innerXContent(builder, params);
         builder.startArray("failures");
         for (Failure failure: bulkFailures) {
@@ -228,9 +238,18 @@ public class BulkByScrollResponse extends ActionResponse implements ToXContentFr
             failure.toXContent(builder, params);
         }
         builder.endArray();
-        if(getResults!=null){
-            builder.startArray(GET);
-            for(GetResult getResult:getResults){
+        if(getResultsNew!=null){
+            builder.startArray(REQ_NEW_SOURCE);
+            for(GetResult getResult:getResultsNew){
+//                builder.startObject();     // No need as GetResult will start it internally
+                getResult.toXContent(builder,params);
+//                builder.endObject();
+            }
+            builder.endArray();
+        }
+        if(getResultsOld!=null){
+            builder.startArray(REQ_OLD_SOURCE);
+            for(GetResult getResult:getResultsOld){
 //                builder.startObject();     // No need as GetResult will start it internally
                 getResult.toXContent(builder,params);
 //                builder.endObject();

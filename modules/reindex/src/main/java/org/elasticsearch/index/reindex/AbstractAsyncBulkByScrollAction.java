@@ -36,11 +36,14 @@ import org.elasticsearch.action.delete.DeleteRequest;
 import org.elasticsearch.action.index.IndexHelper;
 import org.elasticsearch.action.index.IndexRequest;
 import org.elasticsearch.action.support.TransportAction;
+import org.elasticsearch.action.update.UpdateRequest;
 import org.elasticsearch.client.ParentTaskAssigningClient;
 import org.elasticsearch.common.Nullable;
+import org.elasticsearch.common.collect.Tuple;
 import org.elasticsearch.common.unit.ByteSizeValue;
 import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.common.util.concurrent.AbstractRunnable;
+import org.elasticsearch.common.xcontent.XContentHelper;
 import org.elasticsearch.index.VersionType;
 import org.elasticsearch.index.get.GetResult;
 import org.elasticsearch.index.mapper.IdFieldMapper;
@@ -110,9 +113,12 @@ public abstract class AbstractAsyncBulkByScrollAction<Request extends AbstractBu
     private final Retry bulkRetry;
     private final ScrollableHitSource scrollSource;
 
-    private Map<String, DocWriteRequest<?>> allBulkIndexRequest = new HashMap<>();
+    private Map<Tuple<String,String>, ScrollableHitSource.Hit> allBulkHits;
+    private Map<Tuple<String,String>, DocWriteRequest<?>> allBulkIndexRequestWithAppliedScript;
 
-    private List<GetResult> sourceReturnResult = new ArrayList<>();
+    private List<GetResult> sourceReturnNew = new ArrayList<>();
+    private List<GetResult> sourceReturnOld = new ArrayList<>();
+
     /**
      * This BiFunction is used to apply various changes depending of the Reindex action and  the search hit,
      * from copying search hit metadata (parent, routing, etc) to potentially transforming the
@@ -218,6 +224,33 @@ public abstract class AbstractAsyncBulkByScrollAction<Request extends AbstractBu
         return bulkRequest;
     }
 
+    /**
+     *
+     * @param docs the hits got by search request
+     * All hits are saved in Map, which is used to fetch _source for corresponding successfully responded Index Request.
+     */
+    private void SaveHits(Iterable<? extends ScrollableHitSource.Hit> docs){
+        Map<Tuple<String,String>, ScrollableHitSource.Hit> _allBulkHits = new HashMap<>();
+        for (ScrollableHitSource.Hit doc : docs) {
+            if (accept(doc)) {
+                _allBulkHits.put(new Tuple<>(doc.getIndex(),doc.getId()),doc);
+            }
+        }
+        allBulkHits = _allBulkHits;
+    }
+
+    /**
+     *
+     * @param bulkRequest the bulkRequest formed from hits
+     * All requests are saved in Map, which is used to fetch _source for corresponding successfully responded Index Request.
+     */
+    private void SaveAppliedSource(BulkRequest bulkRequest){
+        Map<Tuple<String,String>, DocWriteRequest<?>> allBulkIndexRequest = new HashMap<>();
+        for(DocWriteRequest<?> indexRequest: bulkRequest.requests()){
+            allBulkIndexRequest.put(new Tuple<>(indexRequest.index(),indexRequest.id()),indexRequest);
+        }
+        allBulkIndexRequestWithAppliedScript = allBulkIndexRequest;
+    }
     protected ScrollableHitSource buildScrollableResultSource(BackoffPolicy backoffPolicy) {
         return new ClientScrollableHitSource(logger, backoffPolicy, threadPool, worker::countSearchRetry,
             this::onScrollResponse, this::finishHim, client,
@@ -328,11 +361,14 @@ public abstract class AbstractAsyncBulkByScrollAction<Request extends AbstractBu
                 hits = hits.subList(0, (int) remaining);
             }
         }
+        if(needToFetchSourceOld()){
+                SaveHits(hits);
+        }
+
         BulkRequest request = buildBulk(hits);
-        if(needToFetchSource()) {
-            for(DocWriteRequest<?> indexRequest:request.requests()){
-                allBulkIndexRequest.put(indexRequest.id(),indexRequest);
-            }
+
+        if(needToFetchSourceNew()) {
+            SaveAppliedSource(request);
         }
         if (request.requests().isEmpty()) {
             /*
@@ -379,6 +415,8 @@ public abstract class AbstractAsyncBulkByScrollAction<Request extends AbstractBu
         try {
             List<Failure> failures = new ArrayList<>();
             Set<String> destinationIndicesThisBatch = new HashSet<>();
+            Boolean _needToFetchSourceOld=needToFetchSourceOld();
+            Boolean _needToFetchSourceNew=needToFetchSourceNew();
 
             for (BulkItemResponse item : response) {
                 if (item.isFailed()) {
@@ -393,18 +431,13 @@ public abstract class AbstractAsyncBulkByScrollAction<Request extends AbstractBu
                         } else {
                             worker.countUpdated();
                         }
-                        if(needToFetchSource()){
-                            IndexRequest indexRequest = (IndexRequest) allBulkIndexRequest.get(item.getId());
-
-                            sourceReturnResult.add(IndexHelper.extractGetResult(
-                                indexRequest,
-                                item.getResponse().getIndex(),
-                                item.getResponse().getSeqNo(),
-                                item.getResponse().getPrimaryTerm(),
-                                item.getResponse().getVersion(),
-                                indexRequest.sourceAsMap(),
-                                indexRequest.getContentType(),
-                                indexRequest.source()));
+                        if(_needToFetchSourceNew){
+                            DocWriteRequest<?> request = allBulkIndexRequestWithAppliedScript.get(new Tuple<>(item.getIndex(),item.getId()));
+                            sourceReturnNew.add(extractGetResultFromRequest(request,item));
+                        }
+                        if(_needToFetchSourceOld){
+                            ScrollableHitSource.Hit doc = allBulkHits.get(new Tuple<>(item.getIndex(),item.getId()));
+                            sourceReturnOld.add(extractGetResultFromHit(doc, item));
                         }
                         break;
                     case UPDATE:
@@ -513,8 +546,11 @@ public abstract class AbstractAsyncBulkByScrollAction<Request extends AbstractBu
                 BulkByScrollResponse response = buildResponse(
                         timeValueNanos(System.nanoTime() - startTime.get()),
                         indexingFailures, searchFailures, timedOut);
-                if(needToFetchSource()){
-                    response.setGetResults(sourceReturnResult);
+                if(needToFetchSourceNew()){
+                    response.setGetResultsNew(sourceReturnNew);
+                }
+                if(needToFetchSourceOld()){
+                    response.setGetResultsOld(sourceReturnOld);
                 }
                 listener.onResponse(response);
             } else {
@@ -916,11 +952,66 @@ public abstract class AbstractAsyncBulkByScrollAction<Request extends AbstractBu
     /**
      * Return true if there is need to return the updated documents
      */
-    public boolean needToFetchSource(){
-        if(((UpdateByQueryRequest) mainRequest).fetchSource()==null ||
-            ((UpdateByQueryRequest) mainRequest).fetchSource().fetchSource()==false){
+    public boolean needToFetchSourceNew(){
+        if(((UpdateByQueryRequest) mainRequest).fetchSourceNew()==null ||
+            ((UpdateByQueryRequest) mainRequest).fetchSourceNew().fetchSource()==false){
             return false;
         }
         return true;
+    }
+
+    /**
+     * Return true if there is need to return the old version of documents before it is updated
+     */
+    public boolean needToFetchSourceOld(){
+        if(((UpdateByQueryRequest) mainRequest).fetchSourceOld()==null ||
+            ((UpdateByQueryRequest) mainRequest).fetchSourceOld().fetchSource()==false){
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     *
+     * @param request the request send to update the document
+     * @param item  the corresponding response of indexRequest
+     * @return the GetResult object (i.e. updated documents)
+     */
+    private GetResult extractGetResultFromRequest(DocWriteRequest<?> request, BulkItemResponse item){
+        if(request instanceof IndexRequest) {
+            IndexRequest indexRequest = (IndexRequest) request;
+            return IndexHelper.extractGetResult(
+                ((UpdateByQueryRequest) mainRequest).fetchSourceNew(),
+                indexRequest.type(),
+                indexRequest.id(),
+                item.getResponse().getIndex(),
+                item.getResponse().getSeqNo(),
+                item.getResponse().getPrimaryTerm(),
+                item.getResponse().getVersion(),
+                indexRequest.sourceAsMap(),
+                indexRequest.getContentType(),
+                indexRequest.source());
+        }
+        return null;
+    }
+
+    /**
+     *
+     * @param doc the Hit used to create IndexRequest to update document
+     * @param item the corresponding response of indexRequest
+     * @return the GetResult object (i.e. document before update)
+     */
+    private GetResult extractGetResultFromHit(ScrollableHitSource.Hit doc, BulkItemResponse item){
+        return IndexHelper.extractGetResult(
+            ((UpdateByQueryRequest) mainRequest).fetchSourceOld(),
+            doc.getType(),
+            doc.getId(),
+            item.getResponse().getIndex(),
+            item.getResponse().getSeqNo(),
+            item.getResponse().getPrimaryTerm(),
+            item.getResponse().getVersion(),
+            XContentHelper.convertToMap(doc.getSource(), false, doc.getXContentType()).v2(),
+            doc.getXContentType(),
+            doc.getSource());
     }
 }

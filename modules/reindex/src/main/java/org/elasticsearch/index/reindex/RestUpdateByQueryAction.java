@@ -77,9 +77,13 @@ public class RestUpdateByQueryAction extends AbstractBulkByQueryRestHandler<Upda
         consumers.put("script", o -> internal.setScript(parseScript(o)));
         consumers.put("max_docs", s -> setMaxDocsValidateIdentical(internal, ((Number) s).intValue()));
 
-        FetchSourceContext fetchSourceContext = FetchSourceContext.parseFromRestRequest(request);
-        if (fetchSourceContext != null) {
-            internal.fetchSource(fetchSourceContext);
+        FetchSourceContext fetchSourceContextNew = FetchSourceContext.parseFromRestRequestNew(request);
+        if (fetchSourceContextNew != null) {
+            internal.fetchSourceNew(fetchSourceContextNew);
+        }
+        FetchSourceContext fetchSourceContextOld = FetchSourceContext.parseFromRestRequestOld(request);
+        if (fetchSourceContextOld != null) {
+            internal.fetchSourceOld(fetchSourceContextOld);
         }
         parseInternalRequest(internal, request, consumers);
 
