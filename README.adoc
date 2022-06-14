@@ -1,0 +1,379 @@
+= Elasticsearch - Document Before/After Update
+
+This project add a feature to the Elasticsearch (v7.7.1) that can return a document's older or newer version within the same response of `update`, `update_by_query` and `index` request API. Will see this three APIs separately below.
+
+Please go through xref::README_.asciidoc[Elasticsearch] for details of working and understanding of elasticsearch source code.
+
+My nme is vikashkumar
+From IIT BHU just completed by 3rd year
+
+All the three APIs are discussed below:
+
+Used Postman requests to perform following examples on this source code. If authentication credential are required then pass `username: elastic-admin` and `password: elastic-password`.
+
+== _Part-1_ (Getting start with Elasticsearch)
+
+Let's create a index and add few documents in it.
+
+Create index:
+```
+Request : PUT "http://localhost:9200/index_01"
+JSON body:
+{
+  "settings": {
+    "index": {
+      "number_of_shards": 3,
+      "number_of_replicas": 2
+    }
+  }
+}
+// shards and replices can be changed as per requirement
+```
+
+Insert Document:
+
+.Doc 1
+```
+Request : POST "http://localhost:9200/index_01/_doc/1"
+JSON body:
+{
+  "counter" : 1,
+  "tags" : "Green",
+  "owner":{
+      "name":"A",
+      "age":15
+    }
+}
+```
+
+
+.Doc 2
+```
+Request : POST "http://localhost:9200/index_01/_doc/2"
+JSON body:
+{
+  "counter" : 1,
+  "tags" : "Red",
+  "owner":{
+      "name":"B",
+      "age":20
+    }
+}
+```
+
+
+.Doc 3
+```
+Request : POST "http://localhost:9200/index_01/_doc/3"
+JSON body:
+{
+  "counter" : 2,
+  "tags" : "Brown",
+  "owner":{
+      "name":"C",
+      "age":25
+    }
+}
+```
+
+== _Part-2_ (Fetch document's old/new version in response of request)
+
+
+Older version of document can be fetched by passing `req_old_source` query parameter.
+====
+*req_old_source* : Set to _false_ to disable old source retrieval (default: true). You can also specify a comma-separated list of the fields you want to retrieve.
+
+*req_old_source_excludes:* (Optional,list) Specify the source fields you want to exclude.
+
+*req_old_source_includes:* (Optional,list) Specify the source fields you want to include.
+====
+
+Latest version of document can be fetched by passing `req_new_source` query parameter.
+====
+*req_new_source* : Set to _false_ to disable old source retrieval (default: true). You can also specify a comma-separated list of the fields you want to retrieve.
+
+*req_new_source_excludes:* (Optional,list) Specify the source fields you want to exclude.
+
+*req_new_source_includes:* (Optional,list) Specify the source fields you want to include.
+====
+
+=== # Update API
+
+```
+POST /<index>/_update/<_id>
+```
+.A simple script is used in both of the following request as an request body
+```
+{
+  "script" : {
+    "source": "ctx._source.counter += params.count",
+    "lang": "painless",
+    "params" :
+      "count" : 1
+    }
+  }
+}
+```
+.Let's fetch *old version* of _doc 1 within response of below update request,
+```
+Request: POST "http://localhost:9200/index_01/_update/1?req_old_source=true"
+
+Response:
+{
+    "_index": "index_01",
+    "_type": "_doc",
+    "_id": "1",
+    "_version": 2,
+    "result": "updated",
+    "_shards": {
+        "total": 3,
+        "successful": 1,
+        "failed": 0
+    },
+    "_seq_no": 1,
+    "_primary_term": 1,
+    "req_old_source": {
+        "_seq_no": 0,
+        "_primary_term": 1,
+        "found": true,
+        "_source": {
+            "counter": 1,
+            "tags": "Green",
+            "owner": {
+                "name": "A",
+                "age": 15
+            }
+        }
+    }
+}
+```
+
+.Fetch *new version* of _doc 1 within same response of below update request,
+
+```
+Request: POST "http://localhost:9200/index_01/_update/1?req_new_source=true"
+
+Response:
+{
+    "_index": "index_01",
+    "_type": "_doc",
+    "_id": "1",
+    "_version": 3,
+    "result": "updated",
+    "_shards": {
+        "total": 3,
+        "successful": 1,
+        "failed": 0
+    },
+    "_seq_no": 2,
+    "_primary_term": 1,
+    "req_new_source": {
+        "_seq_no": 2,
+        "_primary_term": 1,
+        "found": true,
+        "_source": {
+            "counter": 3,
+            "tags": "Green",
+            "owner": {
+                "name": "A",
+                "age": 15
+            }
+        }
+    }
+}
+```
+
+=== # Update_by_query API
+
+```
+POST /<target>/_update_by_query
+```
+
+
+.Let's fetch *old version* of documents which satisfy query and are being updated by following request. (Changes of above `update` requests are ignored),
+```
+Request: POST "http://localhost:9200/index_01/_update_by_query?req_old_source=true"
+body:
+{
+  "script": {
+    "source": "ctx._source.counter+=params.count;",
+    "lang": "painless",
+    "params":{
+        "count":5
+    }
+  },
+  "query": {
+    "match": {
+      "counter": 1
+    }
+  }
+}
+
+
+
+Response:
+{
+    "took": 353,
+    "timed_out": false,
+    "total": 2,
+    "updated": 2,
+    "deleted": 0,
+    "batches": 1,
+    "version_conflicts": 0,
+    "noops": 0,
+    "retries": {
+        "bulk": 0,
+        "search": 0
+    },
+    "throttled_millis": 0,
+    "requests_per_second": -1.0,
+    "throttled_until_millis": 0,
+    "failures": [],
+    "req_old_source": [
+        {
+            "_index": "index_01",
+            "_type": "_doc",
+            "_id": "2",
+            "_seq_no": 0,
+            "_primary_term": 1,
+            "found": true,
+            "_source": {
+                "counter": 1,
+                "tags": "Red",
+                "owner": {
+                    "name": "B",
+                    "age": 20
+                }
+            }
+        },
+        {
+            "_index": "index_01",
+            "_type": "_doc",
+            "_id": "1",
+            "_seq_no": 0,
+            "_primary_term": 1,
+            "found": true,
+            "_source": {
+                "counter": 1,
+                "tags": "Green",
+                "owner": {
+                    "name": "A",
+                    "age": 15
+                }
+            }
+        }
+    ]
+}
+```
+
+.Fetch *new version* of documents which satisfy query and are being updated by following request.,
+
+```
+Request: POST "http://localhost:9200/index_01/_update_by_query?req_new_source=true"
+body:
+{
+  "script": {
+    "source": "ctx._source.counter+=params.count;",
+    "lang": "painless",
+    "params":{
+        "count":5
+    }
+  },
+  "query": {
+    "match": {
+      "counter": 2
+    }
+  }
+}
+
+
+
+Response:
+{
+    "took": 85,
+    "timed_out": false,
+    "total": 1,
+    "updated": 1,
+    "deleted": 0,
+    "batches": 1,
+    "version_conflicts": 0,
+    "noops": 0,
+    "retries": {
+        "bulk": 0,
+        "search": 0
+    },
+    "throttled_millis": 0,
+    "requests_per_second": -1.0,
+    "throttled_until_millis": 0,
+    "failures": [],
+    "req_new_source": [
+        {
+            "_index": "index_01",
+            "_type": "_doc",
+            "_id": "3",
+            "_version": 2,
+            "_seq_no": 3,
+            "_primary_term": 1,
+            "found": true,
+            "_source": {
+                "owner": {
+                    "name": "C",
+                    "age": 25
+                },
+                "counter": 7,
+                "tags": "Brown"
+            }
+        }
+    ]
+}
+```
+
+=== # Index API
+
+```
+POST /<target>/_doc/<_id>
+```
+If document with <_id> already exist than this request act as an update request which overwrites the current data _source with data sent in the body of this request. If required to fetch the updated source in response, then it can be done using `_source` query parameter.
+
+Only new version can be fetched for this request.
+```
+Request: POST "http://localhost:9200/index_01/_doc/1?_source=true"
+body:
+{
+  "counter" : 10, // only change with respect to previous version
+  "tags" : "Green",
+  "owner":{
+      "name":"A",
+      "age":15
+    }
+}
+
+Response:
+{
+    "_index": "index_01",
+    "_type": "_doc",
+    "_id": "1",
+    "_version": 2,
+    "result": "updated",
+    "_shards": {
+        "total": 3,
+        "successful": 1,
+        "failed": 0
+    },
+    "_seq_no": 1,
+    "_primary_term": 1,
+    "get": {
+        "_seq_no": 1,
+        "_primary_term": 1,
+        "found": true,
+        "_source": {
+            "counter": 10,
+            "tags": "Green",
+            "owner": {
+                "name": "A",
+                "age": 15
+            }
+        }
+    }
+}
+```
