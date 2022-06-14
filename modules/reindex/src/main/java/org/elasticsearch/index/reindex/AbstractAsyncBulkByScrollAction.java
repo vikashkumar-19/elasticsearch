@@ -445,6 +445,10 @@ public abstract class AbstractAsyncBulkByScrollAction<Request extends AbstractBu
                         break;
                     case DELETE:
                         worker.countDeleted();
+                        if(_needToFetchSourceOld){
+                            ScrollableHitSource.Hit doc = allBulkHits.get(new Tuple<>(item.getIndex(),item.getId()));
+                            sourceReturnOld.add(extractGetResultFromHit(doc, item));
+                        }
                         break;
                 }
                 // Track the indexes we've seen so we can refresh them if requested

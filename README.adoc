@@ -1,3 +1,12 @@
+ifdef::env-github[]
+:tip-caption: :bulb:
+:note-caption: :information_source:
+:important-caption: :heavy_exclamation_mark:
+:caution-caption: :fire:
+:warning-caption: :warning:
+endif::[]
+
+
 = Elasticsearch - Document Before/After Update
 
 This project add a feature to the Elasticsearch (v7.7.1) that can return a document's older or newer version within the same response of `update`, `update_by_query` and `index` request API. Will see this three APIs separately below.
@@ -80,6 +89,8 @@ JSON body:
 
 
 Older version of document can be fetched by passing `req_old_source` query parameter.
+
+[NOTE]
 ====
 *req_old_source* : Set to _false_ to disable old source retrieval (default: true). You can also specify a comma-separated list of the fields you want to retrieve.
 
@@ -89,6 +100,7 @@ Older version of document can be fetched by passing `req_old_source` query param
 ====
 
 Latest version of document can be fetched by passing `req_new_source` query parameter.
+[NOTE]
 ====
 *req_new_source* : Set to _false_ to disable old source retrieval (default: true). You can also specify a comma-separated list of the fields you want to retrieve.
 
