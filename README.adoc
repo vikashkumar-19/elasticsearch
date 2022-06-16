@@ -13,8 +13,6 @@ This project add a feature to the Elasticsearch (v7.7.1) that can return a docum
 
 Please go through xref::README_.asciidoc[Elasticsearch] for details of working and understanding of elasticsearch source code.
 
-My nme is vikashkumar
-From IIT BHU just completed by 3rd year
 
 All the three APIs are discussed below:
 
