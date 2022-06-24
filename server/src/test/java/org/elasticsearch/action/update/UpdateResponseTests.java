@@ -79,10 +79,27 @@ public class UpdateResponseTests extends ESTestCase {
 
             String output = Strings.toString(updateResponse);
             assertEquals("{\"_index\":\"books\",\"_type\":\"book\",\"_id\":\"1\",\"_version\":2,\"result\":\"updated\"," +
-                    "\"_shards\":{\"total\":3,\"successful\":2,\"failed\":0},\"_seq_no\":7,\"_primary_term\":17,\"get\":{" +
+                    "\"_shards\":{\"total\":3,\"successful\":2,\"failed\":0},\"_seq_no\":7,\"_primary_term\":17,\"req_new_source\":{" +
                     "\"_seq_no\":0,\"_primary_term\":1,\"found\":true," +
                     "\"_source\":{\"title\":\"Book title\",\"isbn\":\"ABC-123\"},\"fields\":{\"isbn\":[\"ABC-123\"],\"title\":[\"Book " +
                     "title\"]}}}", output);
+        }
+        {
+            BytesReference source = new BytesArray("{\"title\":\"Book title\",\"isbn\":\"ABC-123\"}");
+            Map<String, DocumentField> fields = new HashMap<>();
+            fields.put("title", new DocumentField("title", Collections.singletonList("Book title")));
+            fields.put("isbn", new DocumentField("isbn", Collections.singletonList("ABC-123")));
+
+            UpdateResponse updateResponse = new UpdateResponse(new ReplicationResponse.ShardInfo(3, 2),
+                new ShardId("books", "books_uuid", 2), "book", "1", 7, 17, 2, UPDATED);
+            updateResponse.setGetResultOld(new GetResult("books", "book", "1",6, 1, 1, true, source, fields, null));
+
+            String output = Strings.toString(updateResponse);
+            assertEquals("{\"_index\":\"books\",\"_type\":\"book\",\"_id\":\"1\",\"_version\":2,\"result\":\"updated\"," +
+                "\"_shards\":{\"total\":3,\"successful\":2,\"failed\":0},\"_seq_no\":7,\"_primary_term\":17,\"req_old_source\":{" +
+                "\"_seq_no\":6,\"_primary_term\":1,\"found\":true," +
+                "\"_source\":{\"title\":\"Book title\",\"isbn\":\"ABC-123\"},\"fields\":{\"isbn\":[\"ABC-123\"],\"title\":[\"Book " +
+                "title\"]}}}", output);
         }
     }
 

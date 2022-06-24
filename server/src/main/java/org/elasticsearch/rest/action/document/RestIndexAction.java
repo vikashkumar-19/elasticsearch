@@ -168,23 +168,7 @@ public class RestIndexAction extends BaseRestHandler {
         }
 
         return channel ->
-                client.index(indexRequest, new RestStatusToXContentListener<IndexResponse>(channel, r -> r.getLocation(indexRequest.routing())){
-                    @Override
-                    public RestResponse buildResponse(IndexResponse indexResponse, XContentBuilder builder) throws Exception {
-                        final BytesReference indexSourceBytes = indexRequest.source();
-                        GetResult sourceResult = IndexHelper.extractGetResult(
-                            indexRequest,
-                            indexResponse.getIndex(),
-                            indexResponse.getSeqNo(),
-                            indexResponse.getPrimaryTerm(),
-                            indexResponse.getVersion(),
-                            indexRequest.sourceAsMap(),
-                            indexRequest.getContentType(),
-                            indexSourceBytes);
-                        indexResponse.setGetResult(sourceResult);
-                        return super.buildResponse(indexResponse, builder);
-                    }
-                });
+                client.index(indexRequest, new RestStatusToXContentListener<IndexResponse>(channel, r -> r.getLocation(indexRequest.routing())));
     }
 
 }

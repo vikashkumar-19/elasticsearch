@@ -79,7 +79,7 @@ public class RestUpdateByQueryAction extends AbstractBulkByQueryRestHandler<Upda
 
         FetchSourceContext fetchSourceContextNew = FetchSourceContext.parseFromRestRequestNew(request);
         if (fetchSourceContextNew != null) {
-            internal.fetchSourceNew(fetchSourceContextNew);
+            internal.fetchSource(fetchSourceContextNew);
         }
         FetchSourceContext fetchSourceContextOld = FetchSourceContext.parseFromRestRequestOld(request);
         if (fetchSourceContextOld != null) {

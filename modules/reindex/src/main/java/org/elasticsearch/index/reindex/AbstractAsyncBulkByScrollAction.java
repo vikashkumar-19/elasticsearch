@@ -35,8 +35,10 @@ import org.elasticsearch.action.bulk.Retry;
 import org.elasticsearch.action.delete.DeleteRequest;
 import org.elasticsearch.action.index.IndexHelper;
 import org.elasticsearch.action.index.IndexRequest;
+import org.elasticsearch.action.index.IndexResponse;
 import org.elasticsearch.action.support.TransportAction;
 import org.elasticsearch.action.update.UpdateRequest;
+import org.elasticsearch.action.update.UpdateResponse;
 import org.elasticsearch.client.ParentTaskAssigningClient;
 import org.elasticsearch.common.Nullable;
 import org.elasticsearch.common.collect.Tuple;
@@ -432,8 +434,12 @@ public abstract class AbstractAsyncBulkByScrollAction<Request extends AbstractBu
                             worker.countUpdated();
                         }
                         if(_needToFetchSourceNew){
-                            DocWriteRequest<?> request = allBulkIndexRequestWithAppliedScript.get(new Tuple<>(item.getIndex(),item.getId()));
-                            sourceReturnNew.add(extractGetResultFromRequest(request,item));
+                            if(((IndexResponse)item.getResponse()).getGetResult()!=null) {
+                                sourceReturnNew.add(((IndexResponse) item.getResponse()).getGetResult());
+                            }else{
+                                DocWriteRequest<?> request = allBulkIndexRequestWithAppliedScript.get(new Tuple<>(item.getIndex(),item.getId()));
+                                sourceReturnNew.add(extractGetResultFromRequest(request,item));
+                            }
                         }
                         if(_needToFetchSourceOld){
                             ScrollableHitSource.Hit doc = allBulkHits.get(new Tuple<>(item.getIndex(),item.getId()));
@@ -442,6 +448,18 @@ public abstract class AbstractAsyncBulkByScrollAction<Request extends AbstractBu
                         break;
                     case UPDATE:
                         worker.countUpdated();
+                        if(_needToFetchSourceNew){
+                            if(((UpdateResponse)item.getResponse()).getGetResult()!=null) {
+                                sourceReturnNew.add(((UpdateResponse) item.getResponse()).getGetResult());
+                            }else{
+                                DocWriteRequest<?> request = allBulkIndexRequestWithAppliedScript.get(new Tuple<>(item.getIndex(),item.getId()));
+                                sourceReturnNew.add(extractGetResultFromRequest(request,item));
+                            }
+                        }
+                        if(_needToFetchSourceOld){
+                            ScrollableHitSource.Hit doc = allBulkHits.get(new Tuple<>(item.getIndex(),item.getId()));
+                            sourceReturnOld.add(extractGetResultFromHit(doc, item));
+                        }
                         break;
                     case DELETE:
                         worker.countDeleted();
@@ -957,8 +975,8 @@ public abstract class AbstractAsyncBulkByScrollAction<Request extends AbstractBu
      * Return true if there is need to return the updated documents
      */
     public boolean needToFetchSourceNew(){
-        if(((UpdateByQueryRequest) mainRequest).fetchSourceNew()==null ||
-            ((UpdateByQueryRequest) mainRequest).fetchSourceNew().fetchSource()==false){
+        if(((UpdateByQueryRequest) mainRequest).fetchSource()==null ||
+            ((UpdateByQueryRequest) mainRequest).fetchSource().fetchSource()==false){
             return false;
         }
         return true;
@@ -985,7 +1003,7 @@ public abstract class AbstractAsyncBulkByScrollAction<Request extends AbstractBu
         if(request instanceof IndexRequest) {
             IndexRequest indexRequest = (IndexRequest) request;
             return IndexHelper.extractGetResult(
-                ((UpdateByQueryRequest) mainRequest).fetchSourceNew(),
+                ((UpdateByQueryRequest) mainRequest).fetchSource(),
                 indexRequest.type(),
                 indexRequest.id(),
                 item.getResponse().getIndex(),

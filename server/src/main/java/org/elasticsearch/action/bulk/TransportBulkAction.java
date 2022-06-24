@@ -35,7 +35,9 @@ import org.elasticsearch.action.DocWriteResponse;
 import org.elasticsearch.action.RoutingMissingException;
 import org.elasticsearch.action.admin.indices.create.CreateIndexRequest;
 import org.elasticsearch.action.admin.indices.create.CreateIndexResponse;
+import org.elasticsearch.action.index.IndexHelper;
 import org.elasticsearch.action.index.IndexRequest;
+import org.elasticsearch.action.index.IndexResponse;
 import org.elasticsearch.action.ingest.IngestActionForwarder;
 import org.elasticsearch.action.support.ActionFilters;
 import org.elasticsearch.action.support.AutoCreateIndex;
@@ -503,6 +505,16 @@ public class TransportBulkAction extends HandledTransportAction<BulkRequest, Bul
                             // we may have no response if item failed
                             if (bulkItemResponse.getResponse() != null) {
                                 bulkItemResponse.getResponse().setShardInfo(bulkShardResponse.getShardInfo());
+                            }
+                            if(bulkItemResponse.getResponse() instanceof IndexResponse){
+                                if(bulkRequest.requests.get(bulkItemResponse.getItemId()) instanceof IndexRequest){
+                                    IndexRequest _indexRequest = (IndexRequest) bulkRequest.requests.get(bulkItemResponse.getItemId());
+                                    IndexResponse _indexResponse= (IndexResponse) bulkItemResponse.getResponse();
+                                    _indexResponse.setGetResult(IndexHelper.extractGetResult(_indexRequest.fetchSource(),_indexRequest.type(),_indexRequest.id(),
+                                        _indexRequest.index(),_indexResponse.getSeqNo(),_indexResponse.getPrimaryTerm(),_indexResponse.getVersion(),_indexRequest.sourceAsMap(),
+                                        _indexRequest.getContentType(),_indexRequest.source()));
+                                    bulkItemResponse = new BulkItemResponse(bulkItemResponse.getItemId(),bulkItemResponse.getOpType(),_indexResponse);
+                                }
                             }
                             responses.set(bulkItemResponse.getItemId(), bulkItemResponse);
                         }

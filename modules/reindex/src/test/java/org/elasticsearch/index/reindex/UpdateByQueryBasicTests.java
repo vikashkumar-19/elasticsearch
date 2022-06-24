@@ -20,6 +20,7 @@
 package org.elasticsearch.index.reindex;
 
 import org.elasticsearch.action.index.IndexRequestBuilder;
+import org.elasticsearch.common.Strings;
 import org.elasticsearch.index.get.GetResult;
 import org.elasticsearch.script.Script;
 import org.elasticsearch.search.fetch.subphase.FetchSourceContext;
@@ -171,7 +172,7 @@ public class UpdateByQueryBasicTests extends ReindexTestCase {
         assertThat(response, matcher().updated(0).slices(hasSize(0)));
     }
 
-    public void testDocumentBeforeUpdate() throws Exception {
+    public void testDocumentOldAndNewUpdate() throws Exception {
         Map<String, Integer> s1, s2, s3, s4;
         s1 = new HashMap<>();
         s2 = new HashMap<>();
@@ -184,46 +185,29 @@ public class UpdateByQueryBasicTests extends ReindexTestCase {
 
         indexRandom(true, client().prepareIndex("test", "test", "1").setSource(s1),
             client().prepareIndex("test", "test", "2").setSource(s2));
-//        Script sc = new Script();
         UpdateByQueryRequestBuilder request = updateByQuery();
-        request.request().fetchSourceNew(new FetchSourceContext(true));
+        request.request().fetchSource(new FetchSourceContext(true));
         request.request().fetchSourceOld(new FetchSourceContext(true));
         BulkByScrollResponse response = request.source("test")
             .filter(matchQuery("count", 1)).refresh(true).get();
 
         System.out.println(response.getGetResultsNew());
         System.out.println(response.getGetResultsOld());
-        for(GetResult g : response.getGetResultsOld()){
-            if(g.getId().equals(1)){
-                Boolean target=false;
-                if(g.getSource().get("count").equals(1) && g.getSource().get("tag").equals(1)) target =true;
-                if(target==false){
-                    new AssertionError("Responded Document does not match with old version of document");
-                }
+        assertEquals(true,(boolean)(response.getGetResultsOld()!=null));
+        assertEquals(true,(boolean)(response.getGetResultsNew()!=null));
+        for(GetResult g:response.getGetResultsOld()){
+            String t = g.sourceAsString();
+            if(g.getId().equals("1")) {
+                assertEquals("{\"count\":1,\"tag\":1}", t);
             }else{
-                Boolean target=false;
-                if(g.getSource().get("count").equals(1) && g.getSource().get("tag").equals(2)) target =true;
-                if(target==false){
-                    new AssertionError("Responded Document does not match with old version of document");
-                }
+                assertEquals("{\"count\":1,\"tag\":2}", t);
             }
         }
-        for(GetResult g : response.getGetResultsNew()){
-            if(g.getId().equals(1)){
-                Boolean target=false;
-                if(g.getSource().get("count").equals(1) && g.getSource().get("tag").equals(1)) target =true;
-                if(target.equals(false)){
-                    new AssertionError("Responded Document does not match with New version of document");
-                }
-            }else{
-                Boolean target=false;
-                if(g.getSource().get("count").equals(1) && g.getSource().get("tag").equals(2)) target =true;
-                if(target.equals(false)){
-                    new AssertionError("Responded Document does not match with New version of document");
-                }
-            }
+        for(GetResult g:response.getGetResultsNew()){
+            String t = g.sourceAsString();
+            if(g.getId().equals("1")) assertEquals("{\"count\":1,\"tag\":1}",t);
+            else assertEquals("{\"count\":1,\"tag\":2}",t);
         }
-
     }
 
 }
