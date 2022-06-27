@@ -65,7 +65,7 @@ public class BulkByScrollResponse extends ActionResponse implements ToXContentFr
     private static final String REQ_NEW_SOURCE = "req_new_source";
     private static final String REQ_OLD_SOURCE = "req_old_source";
 
-    private List<GetResult> getResultsNew;
+    private List<GetResult> getResults;
     private List<GetResult> getResultsOld;
 
     @SuppressWarnings("unchecked")
@@ -76,6 +76,12 @@ public class BulkByScrollResponse extends ActionResponse implements ToXContentFr
             BulkByScrollResponseBuilder::new
         );
     static {
+        // old version of document
+        PARSER.declareObjectArray(BulkByScrollResponseBuilder::setGetResultsOld,
+            (p, c) -> GetResult.fromXContentEmbedded(p), new ParseField(REQ_OLD_SOURCE));
+        // new version of document
+        PARSER.declareObjectArray(BulkByScrollResponseBuilder::setGetResults,
+            (p, c) -> GetResult.fromXContentEmbedded(p), new ParseField(REQ_NEW_SOURCE));
         PARSER.declareLong(BulkByScrollResponseBuilder::setTook, new ParseField(TOOK_FIELD));
         PARSER.declareBoolean(BulkByScrollResponseBuilder::setTimedOut, new ParseField(TIMED_OUT_FIELD));
         PARSER.declareObjectArray(
@@ -92,6 +98,8 @@ public class BulkByScrollResponse extends ActionResponse implements ToXContentFr
         bulkFailures = in.readList(Failure::new);
         searchFailures = in.readList(ScrollableHitSource.SearchFailure::new);
         timedOut = in.readBoolean();
+        getResults = in.readList(GetResult::new);
+        getResultsOld = in.readList(GetResult::new);
     }
 
     public BulkByScrollResponse(TimeValue took, BulkByScrollTask.Status status, List<Failure> bulkFailures,
@@ -102,29 +110,45 @@ public class BulkByScrollResponse extends ActionResponse implements ToXContentFr
         this.searchFailures = searchFailures;
         this.timedOut = timedOut;
     }
+    public BulkByScrollResponse(TimeValue took, BulkByScrollTask.Status status, List<Failure> bulkFailures,
+                                List<ScrollableHitSource.SearchFailure> searchFailures, boolean timedOut,
+                                @Nullable List<GetResult> getResults, @Nullable List<GetResult> getResultsOld) {
+        this.took = took;
+        this.status = requireNonNull(status, "Null status not supported");
+        this.bulkFailures = bulkFailures;
+        this.searchFailures = searchFailures;
+        this.timedOut = timedOut;
+        this.getResults = getResults;
+        this.getResultsOld = getResultsOld;
+    }
 
     public BulkByScrollResponse(Iterable<BulkByScrollResponse> toMerge, @Nullable String reasonCancelled) {
         long mergedTook = 0;
         List<BulkByScrollTask.StatusOrException> statuses = new ArrayList<>();
         bulkFailures = new ArrayList<>();
         searchFailures = new ArrayList<>();
+        getResults = new ArrayList<>();
+        getResultsOld = new ArrayList<>();
         for (BulkByScrollResponse response : toMerge) {
             mergedTook = max(mergedTook, response.getTook().nanos());
             statuses.add(new BulkByScrollTask.StatusOrException(response.status));
             bulkFailures.addAll(response.getBulkFailures());
             searchFailures.addAll(response.getSearchFailures());
             timedOut |= response.isTimedOut();
+            if(response.getGetResults()!=null) getResults.addAll(response.getGetResults());
+            if(response.getGetResultsOld()!=null) getResultsOld.addAll(response.getGetResultsOld());
         }
         took = timeValueNanos(mergedTook);
         status = new BulkByScrollTask.Status(statuses, reasonCancelled);
+
     }
 
-    public void setGetResultsNew(List<GetResult> getResults) {
-        this.getResultsNew = getResults;
+    public void setGetResults(List<GetResult> getResults) {
+        this.getResults = getResults;
     }
 
-    public List<GetResult> getGetResultsNew() {
-        return getResultsNew;
+    public List<GetResult> getGetResults() {
+        return getResults;
     }
 
     public void setGetResultsOld(List<GetResult> getResults) {
@@ -220,13 +244,14 @@ public class BulkByScrollResponse extends ActionResponse implements ToXContentFr
         out.writeList(bulkFailures);
         out.writeList(searchFailures);
         out.writeBoolean(timedOut);
+        out.writeList(getResults);
+        out.writeList(getResultsOld);
     }
 
     @Override
     public XContentBuilder toXContent(XContentBuilder builder, Params params) throws IOException {
         builder.field(TOOK_FIELD, took.millis());
         builder.field(TIMED_OUT_FIELD, timedOut);
-//        builder.field("DEV-Check", "OK");
         status.innerXContent(builder, params);
         builder.startArray("failures");
         for (Failure failure: bulkFailures) {
@@ -238,9 +263,9 @@ public class BulkByScrollResponse extends ActionResponse implements ToXContentFr
             failure.toXContent(builder, params);
         }
         builder.endArray();
-        if(getResultsNew!=null){
+        if(getResults!=null){
             builder.startArray(REQ_NEW_SOURCE);
-            for(GetResult getResult:getResultsNew){
+            for(GetResult getResult:getResults){
 //                builder.startObject();     // No need as GetResult will start it internally
                 getResult.toXContent(builder,params);
 //                builder.endObject();

@@ -121,7 +121,6 @@ public class UpdateResponse extends DocWriteResponse {
         builder.append(",primaryTerm=").append(getPrimaryTerm());
         builder.append(",result=").append(getResult().getLowercase());
         builder.append(",shards=").append(getShardInfo());
-        builder.append(",sourse=").append(getGetResult()!=null?getGetResult().sourceAsString():null);
         return builder.append("]").toString();
     }
 
@@ -142,11 +141,16 @@ public class UpdateResponse extends DocWriteResponse {
         XContentParser.Token token = parser.currentToken();
         String currentFieldName = parser.currentName();
 
-        if (GET.equals(currentFieldName)) {
+        if (GET.equals(currentFieldName) || REQ_NEW_SOURCE.equals(currentFieldName)) {
             if (token == XContentParser.Token.START_OBJECT) {
                 context.setGetResult(GetResult.fromXContentEmbedded(parser));
             }
-        } else {
+        }else if(REQ_OLD_SOURCE.equals(currentFieldName)){
+            if(token == XContentParser.Token.START_OBJECT){
+                context.setGetResultOld(GetResult.fromXContentEmbedded(parser));
+            }
+        }
+        else {
             DocWriteResponse.parseInnerToXContent(parser, context);
         }
     }

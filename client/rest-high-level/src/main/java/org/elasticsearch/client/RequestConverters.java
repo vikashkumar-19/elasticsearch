@@ -345,6 +345,8 @@ final class RequestConverters {
         parameters.withPipeline(indexRequest.getPipeline());
         parameters.withRefreshPolicy(indexRequest.getRefreshPolicy());
         parameters.withWaitForActiveShards(indexRequest.waitForActiveShards());
+        parameters.withFetchSourceContextNew(indexRequest.fetchSource());
+
 
         BytesRef source = indexRequest.source().toBytesRef();
         ContentType contentType = createContentType(indexRequest.getContentType());
@@ -369,7 +371,8 @@ final class RequestConverters {
         parameters.withRefreshPolicy(updateRequest.getRefreshPolicy());
         parameters.withWaitForActiveShards(updateRequest.waitForActiveShards());
         parameters.withDocAsUpsert(updateRequest.docAsUpsert());
-        parameters.withFetchSourceContext(updateRequest.fetchSource());
+        parameters.withFetchSourceContextNew(updateRequest.fetchSource());
+        parameters.withFetchSourceContextOld(updateRequest.fetchSourceOld());
         parameters.withRetryOnConflict(updateRequest.retryOnConflict());
         parameters.withVersion(updateRequest.version());
         parameters.withVersionType(updateRequest.versionType());
@@ -633,7 +636,10 @@ final class RequestConverters {
             .withWaitForActiveShards(updateByQueryRequest.getWaitForActiveShards())
             .withRequestsPerSecond(updateByQueryRequest.getRequestsPerSecond())
             .withIndicesOptions(updateByQueryRequest.indicesOptions())
-            .withSlices(updateByQueryRequest.getSlices());
+            .withSlices(updateByQueryRequest.getSlices())
+            .withFetchSourceContextNew(updateByQueryRequest.fetchSource())
+            .withFetchSourceContextOld(updateByQueryRequest.fetchSourceOld());
+
         if (updateByQueryRequest.isAbortOnVersionConflict() == false) {
             params.putParam("conflicts", "proceed");
         }
@@ -844,6 +850,8 @@ final class RequestConverters {
             if (fetchSourceContext != null) {
                 if (fetchSourceContext.fetchSource() == false) {
                     putParam("_source", Boolean.FALSE.toString());
+                }else{
+                    putParam("_source",Boolean.TRUE.toString());
                 }
                 if (fetchSourceContext.includes() != null && fetchSourceContext.includes().length > 0) {
                     putParam("_source_includes", String.join(",", fetchSourceContext.includes()));
@@ -854,7 +862,39 @@ final class RequestConverters {
             }
             return this;
         }
+        Params withFetchSourceContextNew(FetchSourceContext fetchSourceContext) {
+            if (fetchSourceContext != null) {
+                if (fetchSourceContext.fetchSource() == false) {
+                    putParam("req_new_source", Boolean.FALSE.toString());
+                }else{
+                    putParam("req_new_source",Boolean.TRUE.toString());
+                }
+                if (fetchSourceContext.includes() != null && fetchSourceContext.includes().length > 0) {
+                    putParam("req_new_source_includes", String.join(",", fetchSourceContext.includes()));
+                }
+                if (fetchSourceContext.excludes() != null && fetchSourceContext.excludes().length > 0) {
+                    putParam("req_new_source_excludes", String.join(",", fetchSourceContext.excludes()));
+                }
+            }
+            return this;
+        }
 
+        Params withFetchSourceContextOld(FetchSourceContext fetchSourceContext) {
+            if (fetchSourceContext != null) {
+                if (fetchSourceContext.fetchSource() == false) {
+                    putParam("req_old_source", Boolean.FALSE.toString());
+                }else{
+                    putParam("req_old_source",Boolean.TRUE.toString());
+                }
+                if (fetchSourceContext.includes() != null && fetchSourceContext.includes().length > 0) {
+                    putParam("req_old_source_includes", String.join(",", fetchSourceContext.includes()));
+                }
+                if (fetchSourceContext.excludes() != null && fetchSourceContext.excludes().length > 0) {
+                    putParam("req_old_source_excludes", String.join(",", fetchSourceContext.excludes()));
+                }
+            }
+            return this;
+        }
         Params withFields(String[] fields) {
             if (fields != null && fields.length > 0) {
                 return putParam("fields", String.join(",", fields));

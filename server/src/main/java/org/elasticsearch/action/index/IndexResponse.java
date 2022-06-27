@@ -116,7 +116,16 @@ public class IndexResponse extends DocWriteResponse {
      * Parse the current token and update the parsing context appropriately.
      */
     public static void parseXContentFields(XContentParser parser, Builder context) throws IOException {
-        DocWriteResponse.parseInnerToXContent(parser, context);
+        XContentParser.Token token = parser.currentToken();
+        String currentFieldName = parser.currentName();
+
+        if(GET.equals(currentFieldName)){
+            if(token == XContentParser.Token.START_OBJECT){
+                context.setGetResult(GetResult.fromXContentEmbedded(parser));
+            }
+        }else {
+            DocWriteResponse.parseInnerToXContent(parser, context);
+        }
     }
 
     /**

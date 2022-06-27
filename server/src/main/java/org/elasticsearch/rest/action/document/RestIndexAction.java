@@ -153,7 +153,7 @@ public class RestIndexAction extends BaseRestHandler {
         indexRequest.versionType(VersionType.fromString(request.param("version_type"), indexRequest.versionType()));
         indexRequest.setIfSeqNo(request.paramAsLong("if_seq_no", indexRequest.ifSeqNo()));
         indexRequest.setIfPrimaryTerm(request.paramAsLong("if_primary_term", indexRequest.ifPrimaryTerm()));
-        FetchSourceContext fetchSourceContext = FetchSourceContext.parseFromRestRequest(request);
+        FetchSourceContext fetchSourceContext = FetchSourceContext.parseFromRestRequestNew(request);
         if (fetchSourceContext != null) {
             indexRequest.fetchSource(fetchSourceContext);
         }

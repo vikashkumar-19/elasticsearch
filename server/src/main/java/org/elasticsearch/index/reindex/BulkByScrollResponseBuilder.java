@@ -19,9 +19,11 @@
 
 package org.elasticsearch.index.reindex;
 
+import org.elasticsearch.common.Nullable;
 import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.action.bulk.BulkItemResponse.Failure;
 import org.elasticsearch.common.xcontent.ObjectParser;
+import org.elasticsearch.index.get.GetResult;
 import org.elasticsearch.index.reindex.ScrollableHitSource.SearchFailure;
 import org.elasticsearch.index.reindex.BulkByScrollTask.StatusBuilder;
 
@@ -38,6 +40,8 @@ class BulkByScrollResponseBuilder extends StatusBuilder {
     private List<Failure> bulkFailures = new ArrayList<>();
     private List<SearchFailure> searchFailures = new ArrayList<>();
     private boolean timedOut;
+    private List<GetResult> getResults = null;
+    private List<GetResult> getResultsOld = null;
 
     BulkByScrollResponseBuilder() {}
 
@@ -69,8 +73,16 @@ class BulkByScrollResponseBuilder extends StatusBuilder {
         this.timedOut = timedOut;
     }
 
+    public void setGetResults(@Nullable List<GetResult> _getResults){
+        this.getResults = _getResults;
+    }
+    public void setGetResultsOld(@Nullable List<GetResult> _getResultsOld){
+        this.getResultsOld = _getResultsOld;
+    }
     public BulkByScrollResponse buildResponse() {
         status = super.buildStatus();
-        return new BulkByScrollResponse(took, status, bulkFailures, searchFailures, timedOut);
+//        System.out.println(getResults.size()+getResultsOld.size());
+//        System.out.println("failure "+bulkFailures.size());
+        return new BulkByScrollResponse(took, status, bulkFailures, searchFailures, timedOut, getResults, getResultsOld);
     }
 }
