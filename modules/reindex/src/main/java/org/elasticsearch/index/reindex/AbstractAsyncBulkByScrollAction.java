@@ -569,7 +569,7 @@ public abstract class AbstractAsyncBulkByScrollAction<Request extends AbstractBu
                         timeValueNanos(System.nanoTime() - startTime.get()),
                         indexingFailures, searchFailures, timedOut);
                 if(needToFetchSourceNew()){
-                    response.setGetResultsNew(sourceReturnNew);
+                    response.setGetResults(sourceReturnNew);
                 }
                 if(needToFetchSourceOld()){
                     response.setGetResultsOld(sourceReturnOld);

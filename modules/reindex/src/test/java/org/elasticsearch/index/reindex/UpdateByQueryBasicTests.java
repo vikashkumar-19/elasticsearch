@@ -191,10 +191,10 @@ public class UpdateByQueryBasicTests extends ReindexTestCase {
         BulkByScrollResponse response = request.source("test")
             .filter(matchQuery("count", 1)).refresh(true).get();
 
-        System.out.println(response.getGetResultsNew());
+        System.out.println(response.getGetResults());
         System.out.println(response.getGetResultsOld());
         assertEquals(true,(boolean)(response.getGetResultsOld()!=null));
-        assertEquals(true,(boolean)(response.getGetResultsNew()!=null));
+        assertEquals(true,(boolean)(response.getGetResults()!=null));
         for(GetResult g:response.getGetResultsOld()){
             String t = g.sourceAsString();
             if(g.getId().equals("1")) {
@@ -203,7 +203,7 @@ public class UpdateByQueryBasicTests extends ReindexTestCase {
                 assertEquals("{\"count\":1,\"tag\":2}", t);
             }
         }
-        for(GetResult g:response.getGetResultsNew()){
+        for(GetResult g:response.getGetResults()){
             String t = g.sourceAsString();
             if(g.getId().equals("1")) assertEquals("{\"count\":1,\"tag\":1}",t);
             else assertEquals("{\"count\":1,\"tag\":2}",t);

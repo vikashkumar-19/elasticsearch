@@ -36,6 +36,7 @@ import org.elasticsearch.common.bytes.BytesReference;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.common.xcontent.XContentType;
+import org.elasticsearch.index.get.GetResult;
 import org.elasticsearch.index.query.IdsQueryBuilder;
 import org.elasticsearch.index.reindex.BulkByScrollResponse;
 import org.elasticsearch.index.reindex.DeleteByQueryAction;
@@ -258,6 +259,60 @@ public class ReindexIT extends ESRestHighLevelClientTestCase {
                 (int) (highLevelClient().get(new GetRequest(sourceIndex, "2"), RequestOptions.DEFAULT)
                     .getSourceAsMap().get("foo"))
             );
+        }
+        {
+            // test3: update and fetch old version of document
+            UpdateByQueryRequest updateByQueryRequest = new UpdateByQueryRequest();
+            updateByQueryRequest.indices(sourceIndex);
+            updateByQueryRequest.setScript(new Script("if (ctx._source.foo == 1) ctx._source.foo++;"));
+            updateByQueryRequest.fetchSourceOld(true);
+            updateByQueryRequest.setRefresh(true);
+            BulkByScrollResponse bulkResponse =
+                execute(updateByQueryRequest, highLevelClient()::updateByQuery, highLevelClient()::updateByQueryAsync);
+            assertEquals(2, bulkResponse.getTotal());
+            assertEquals(2, bulkResponse.getUpdated());
+            assertEquals(0, bulkResponse.getDeleted());
+            assertEquals(0, bulkResponse.getNoops());
+            assertEquals(0, bulkResponse.getVersionConflicts());
+            assertEquals(1, bulkResponse.getBatches());
+            assertTrue(bulkResponse.getTook().getMillis() > 0);
+            assertEquals(1, bulkResponse.getBatches());
+            assertEquals(0, bulkResponse.getBulkFailures().size());
+            assertEquals(0, bulkResponse.getSearchFailures().size());
+            for(GetResult g:bulkResponse.getGetResultsOld()){
+                if(g.getId().equals("1")){
+                    assertEquals("{\"foo\":1}",g.sourceAsString());
+                }else{
+                    assertEquals("{\"foo\":3}",g.sourceAsString());
+                }
+            }
+        }
+        {
+            // test4: update and fetch new version of document
+            UpdateByQueryRequest updateByQueryRequest = new UpdateByQueryRequest();
+            updateByQueryRequest.indices(sourceIndex);
+            updateByQueryRequest.setScript(new Script("if (ctx._source.foo == 3) ctx._source.foo++;"));
+            updateByQueryRequest.fetchSource(true);
+            updateByQueryRequest.setRefresh(true);
+            BulkByScrollResponse bulkResponse =
+                execute(updateByQueryRequest, highLevelClient()::updateByQuery, highLevelClient()::updateByQueryAsync);
+            assertEquals(2, bulkResponse.getTotal());
+            assertEquals(2, bulkResponse.getUpdated());
+            assertEquals(0, bulkResponse.getDeleted());
+            assertEquals(0, bulkResponse.getNoops());
+            assertEquals(0, bulkResponse.getVersionConflicts());
+            assertEquals(1, bulkResponse.getBatches());
+            assertTrue(bulkResponse.getTook().getMillis() > 0);
+            assertEquals(1, bulkResponse.getBatches());
+            assertEquals(0, bulkResponse.getBulkFailures().size());
+            assertEquals(0, bulkResponse.getSearchFailures().size());
+            for(GetResult g:bulkResponse.getGetResultsOld()){
+                if(g.getId().equals("1")){
+                    assertEquals("{\"foo\":2}",g.sourceAsString());
+                }else{
+                    assertEquals("{\"foo\":4}",g.sourceAsString());
+                }
+            }
         }
         {
             // test update-by-query rethrottling

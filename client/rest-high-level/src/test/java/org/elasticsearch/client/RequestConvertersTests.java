@@ -1981,20 +1981,20 @@ public class RequestConvertersTests extends ESTestCase {
                 boolean fetchSource = randomBoolean();
                 consumer.accept(new FetchSourceContext(fetchSource));
                 if (fetchSource == false) {
-                    expectedParams.put("_source", "false");
+                    expectedParams.put("req_new_source", "false");
                 }
             } else {
                 int numIncludes = randomIntBetween(0, 5);
                 String[] includes = new String[numIncludes];
                 String includesParam = randomFields(includes);
                 if (numIncludes > 0) {
-                    expectedParams.put("_source_includes", includesParam);
+                    expectedParams.put("req_new_source_includes", includesParam);
                 }
                 int numExcludes = randomIntBetween(0, 5);
                 String[] excludes = new String[numExcludes];
                 String excludesParam = randomFields(excludes);
                 if (numExcludes > 0) {
-                    expectedParams.put("_source_excludes", excludesParam);
+                    expectedParams.put("req_new_source_excludes", excludesParam);
                 }
                 consumer.accept(new FetchSourceContext(true, includes, excludes));
             }

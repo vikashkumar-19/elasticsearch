@@ -20,16 +20,20 @@
 package org.elasticsearch.rest.action.document;
 
 import org.elasticsearch.action.ActionRequestValidationException;
+import org.elasticsearch.action.update.UpdateResponse;
 import org.elasticsearch.client.node.NodeClient;
+import org.elasticsearch.common.CheckedConsumer;
 import org.elasticsearch.common.bytes.BytesArray;
 import org.elasticsearch.common.xcontent.XContentType;
 import org.elasticsearch.index.VersionType;
+import org.elasticsearch.rest.BaseRestHandler;
 import org.elasticsearch.rest.RestRequest;
 import org.elasticsearch.rest.RestRequest.Method;
 import org.elasticsearch.test.rest.FakeRestRequest;
 import org.elasticsearch.test.rest.RestActionTestCase;
 import org.junit.Before;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -88,4 +92,24 @@ public class RestUpdateActionTests extends RestActionTestCase {
         assertThat(e.getMessage(), containsString("internal versioning can not be used for optimistic concurrency control. " +
             "Please use `if_seq_no` and `if_primary_term` instead"));
     }
+
+//    public void testUpdateDocSource() throws IOException {
+//        Map<String, String> params = new HashMap<>();
+//        params.put("req_new_source","true");
+//        String content =
+//            "{\n" +
+//                "    \"doc\" : {\n" +
+//                "        \"count\" : \"1\"\n" +
+//                "    }\n" +
+//                "}";
+//        FakeRestRequest updateRequest = new FakeRestRequest.Builder(xContentRegistry())
+//            .withMethod(RestRequest.Method.POST)
+//            .withPath("test/_update/1")
+//            .withParams(params)
+//            .withContent(new BytesArray(content), XContentType.JSON)
+//            .build();
+//        CheckedConsumer<?,?> act =  action.prepareRequest(updateRequest,mock(NodeClient.class));
+//        act.accept();
+//        System.out.println(response);
+//    }
 }
