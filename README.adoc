@@ -387,3 +387,7 @@ Response:
     }
 }
 ```
+
+== High Level Rest Client
+
+It accepts request objects as an argument and returns response objects so that request marshalling and response un-marshalling is handled by the client itself. Here is an small demonstration of Rest Client link:https://github.com/vikashkumar-19/Elasticsearch-RestHighLevelClient[here].
