@@ -347,7 +347,7 @@ If document with <_id> already exist then this request act as an update request 
 
 Only new version can be fetched for this request.
 ```
-Request: POST "http://localhost:9200/index_01/_doc/1?_source=true"
+Request: POST "http://localhost:9200/index_01/_doc/1?req_new_source=true"
 body:
 {
   "counter" : 10, // only change with respect to previous version
