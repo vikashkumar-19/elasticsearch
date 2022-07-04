@@ -652,6 +652,9 @@ final class RequestConverters {
         if (updateByQueryRequest.getMaxDocs() > 0) {
             params.putParam("max_docs", Integer.toString(updateByQueryRequest.getMaxDocs()));
         }
+        if(updateByQueryRequest.getMaxDocsReturn() != UpdateByQueryRequest.MAX_DOCS_RETURN_DEFAULT){
+            params.putParam("max_docs_return", Integer.toString(updateByQueryRequest.getMaxDocsReturn()));
+        }
         request.addParameters(params.asMap());
         request.setEntity(createEntity(updateByQueryRequest, REQUEST_BODY_CONTENT_TYPE));
         return request;

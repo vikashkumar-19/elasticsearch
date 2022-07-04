@@ -343,7 +343,7 @@ Response:
 ```
 POST /<target>/_doc/<_id>
 ```
-If document with <_id> already exist then this request act as an update request which overwrites the current data _source with data sent in the body of this request. If required to fetch the updated source in response, then it can be done using `_source` query parameter.
+If document with <_id> already exist then this request act as an update request which overwrites the current data _source with data sent in the body of this request. If required to fetch the updated source in response, then it can be done using `req_new_source` query parameter.
 
 Only new version can be fetched for this request.
 ```

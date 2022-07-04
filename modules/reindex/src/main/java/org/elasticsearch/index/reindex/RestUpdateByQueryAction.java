@@ -85,6 +85,8 @@ public class RestUpdateByQueryAction extends AbstractBulkByQueryRestHandler<Upda
         if (fetchSourceContextOld != null) {
             internal.fetchSourceOld(fetchSourceContextOld);
         }
+        // set maximum document has to be return
+        internal.setMaxDocsReturn(parseMaxDocsReturn(request));
         parseInternalRequest(internal, request, consumers);
 
         internal.setPipeline(request.param("pipeline"));
@@ -153,5 +155,13 @@ public class RestUpdateByQueryAction extends AbstractBulkByQueryRestHandler<Upda
         } else {
             throw new IllegalArgumentException("Script value should be a String or a Map");
         }
+    }
+
+    private static int parseMaxDocsReturn(RestRequest request){
+        int maxDocsReturn = request.paramAsInt("max_docs_return",UpdateByQueryRequest.MAX_DOCS_RETURN_DEFAULT);
+        if(maxDocsReturn<0){
+            throw new IllegalArgumentException("Failed to parse int parameter [" + "max_docs_return" + "] with value [" + maxDocsReturn + "], It's value has to be non-negative");
+        }
+        return maxDocsReturn;
     }
 }

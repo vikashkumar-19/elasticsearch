@@ -417,8 +417,9 @@ public abstract class AbstractAsyncBulkByScrollAction<Request extends AbstractBu
         try {
             List<Failure> failures = new ArrayList<>();
             Set<String> destinationIndicesThisBatch = new HashSet<>();
-            Boolean _needToFetchSourceOld=needToFetchSourceOld();
-            Boolean _needToFetchSourceNew=needToFetchSourceNew();
+            Boolean _needToFetchSourceOld = needToFetchSourceOld();
+            Boolean _needToFetchSourceNew = needToFetchSourceNew();
+            int maxDocsReturn = ((UpdateByQueryRequest)this.mainRequest).getMaxDocsReturn();
 
             for (BulkItemResponse item : response) {
                 if (item.isFailed()) {
@@ -433,7 +434,7 @@ public abstract class AbstractAsyncBulkByScrollAction<Request extends AbstractBu
                         } else {
                             worker.countUpdated();
                         }
-                        if(_needToFetchSourceNew){
+                        if(_needToFetchSourceNew && sourceReturnNew.size() < maxDocsReturn){
                             if(((IndexResponse)item.getResponse()).getGetResult()!=null) {
                                 sourceReturnNew.add(((IndexResponse) item.getResponse()).getGetResult());
                             }else{
@@ -441,14 +442,14 @@ public abstract class AbstractAsyncBulkByScrollAction<Request extends AbstractBu
                                 sourceReturnNew.add(extractGetResultFromRequest(request,item));
                             }
                         }
-                        if(_needToFetchSourceOld){
+                        if(_needToFetchSourceOld && sourceReturnOld.size() < maxDocsReturn){
                             ScrollableHitSource.Hit doc = allBulkHits.get(new Tuple<>(item.getIndex(),item.getId()));
                             sourceReturnOld.add(extractGetResultFromHit(doc, item));
                         }
                         break;
                     case UPDATE:
                         worker.countUpdated();
-                        if(_needToFetchSourceNew){
+                        if(_needToFetchSourceNew && sourceReturnNew.size() < maxDocsReturn){
                             if(((UpdateResponse)item.getResponse()).getGetResult()!=null) {
                                 sourceReturnNew.add(((UpdateResponse) item.getResponse()).getGetResult());
                             }else{
@@ -456,14 +457,14 @@ public abstract class AbstractAsyncBulkByScrollAction<Request extends AbstractBu
                                 sourceReturnNew.add(extractGetResultFromRequest(request,item));
                             }
                         }
-                        if(_needToFetchSourceOld){
+                        if(_needToFetchSourceOld && sourceReturnOld.size() < maxDocsReturn){
                             ScrollableHitSource.Hit doc = allBulkHits.get(new Tuple<>(item.getIndex(),item.getId()));
                             sourceReturnOld.add(extractGetResultFromHit(doc, item));
                         }
                         break;
                     case DELETE:
                         worker.countDeleted();
-                        if(_needToFetchSourceOld){
+                        if(_needToFetchSourceOld && sourceReturnOld.size() < maxDocsReturn){
                             ScrollableHitSource.Hit doc = allBulkHits.get(new Tuple<>(item.getIndex(),item.getId()));
                             sourceReturnOld.add(extractGetResultFromHit(doc, item));
                         }

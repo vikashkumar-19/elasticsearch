@@ -49,7 +49,9 @@ public class UpdateByQueryRequest extends AbstractBulkIndexByScrollRequest<Updat
     private String pipeline;
     private FetchSourceContext fetchSourceContext;
     private FetchSourceContext fetchSourceContextOld;
+    public static final int MAX_DOCS_RETURN_DEFAULT = 10;
 
+    private int maxDocsReturn = MAX_DOCS_RETURN_DEFAULT;
     public UpdateByQueryRequest() {
         this(new SearchRequest());
     }
@@ -224,7 +226,13 @@ public class UpdateByQueryRequest extends AbstractBulkIndexByScrollRequest<Updat
     }
 
 
-
+    public int getMaxDocsReturn(){
+        return this.maxDocsReturn;
+    }
+    public UpdateByQueryRequest setMaxDocsReturn(int maxDocReturn){
+        this.maxDocsReturn = maxDocReturn;
+        return this;
+    }
 
 
 
