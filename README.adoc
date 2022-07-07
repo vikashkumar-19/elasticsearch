@@ -7,7 +7,7 @@ ifdef::env-github[]
 endif::[]
 
 
-= Elasticsearch - Document Before/After Update
+= Elasticsearch - Fetch old/new version of document(s) within Update requests.
 
 This project add a feature to the Elasticsearch (v7.7.1) that can return a document's older or newer version within the same response of `update`, `update_by_query` and `index` request API. Will see this three APIs separately below.
 
@@ -337,6 +337,8 @@ Response:
     ]
 }
 ```
+
+Number of document return is default 10. To change this limit pass this `max_docs_return` query parameter with the value you want to set. In case of Rest Client you can set this limit with `updateByQueryRequest.setMaxDocsReturn(value)`
 
 === # Index API
 
